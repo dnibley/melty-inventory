@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import "../fonts.css";
+import LogoLight from "../LogoLight.jsx";
+import LogoDark from "../LogoDark.jsx";
 
 const B = {
   gold:     '#FFAD41',
@@ -167,8 +169,9 @@ export default function Dashboard() {
       <div style={{ background:B.black, borderBottom:`3px solid ${B.gold}`, padding:'14px 24px', position:'sticky', top:0, zIndex:50 }}>
         <div style={{ maxWidth:1200, margin:'0 auto', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
           <div>
-            <div style={{ fontFamily:B.futura, fontSize:22, fontWeight:800, color:B.gold, letterSpacing:'2px', textTransform:'uppercase', lineHeight:1 }}>
-              MELTY <span style={{ color:'rgba(255,255,255,.3)', fontWeight:400, fontSize:13, letterSpacing:0, textTransform:'none', fontFamily:B.font }}>Ops Dashboard</span>
+            <div style={{ display:'flex', alignItems:'center', gap:14 }}>
+              <LogoLight width={100}/>
+              <span style={{ color:'rgba(255,255,255,.3)', fontSize:12, fontWeight:500, fontFamily:B.font, borderLeft:'1px solid rgba(255,255,255,.15)', paddingLeft:14 }}>Ops Dashboard</span>
             </div>
             <div style={{ color:'rgba(255,255,255,.35)', fontSize:11, marginTop:3, display:'flex', alignItems:'center', gap:5, fontWeight:500 }}>
               <IconClock/> {lastRef ? `Updated ${fmtDate(lastRef.toISOString())}` : 'Loading…'}

@@ -1,5 +1,7 @@
 import { useState, useMemo } from "react";
 import "./fonts.css";
+import LogoLight from "./LogoLight.jsx";
+import LogoDark from "./LogoDark.jsx";
 
 // ── MELTY BRAND TOKENS ────────────────────────────────────────────────────────
 const B = {
@@ -285,7 +287,7 @@ export default function App() {
       <div style={{ background:B.black, borderBottom:`3px solid ${B.gold}`, padding:"14px 16px 12px", position:"sticky", top:0, zIndex:50 }}>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
           <div>
-            <div style={{ color:B.gold, fontFamily:B.futura, fontSize:24, fontWeight:800, letterSpacing:"1px", textTransform:"uppercase", lineHeight:1 }}>MELTY</div>
+            <LogoLight width={110}/>
             <div style={{ color:"rgba(255,255,255,.5)", fontSize:11, marginTop:3, fontWeight:500 }}>
               {storeName || "Set store in Settings"} · Week {weekNumber}{submitter ? ` · ${submitter}` : ""}
             </div>
@@ -421,6 +423,7 @@ export default function App() {
           <div style={{ width:80, height:80, borderRadius:40, background:B.gold, border:`3px solid ${B.darkGold}`, display:"flex", alignItems:"center", justifyContent:"center", marginBottom:20 }}>
             <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke={B.black} strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
           </div>
+          <LogoDark width={100} style={{ marginBottom:12 }}/>
           <div style={{ fontFamily:B.futura, fontSize:28, fontWeight:800, color:B.black, letterSpacing:"1px", textTransform:"uppercase", marginBottom:6 }}>Submitted!</div>
           <div style={{ fontSize:13, color:B.gray, marginBottom:28, textAlign:"center", fontWeight:500, lineHeight:1.6 }}>
             Week {submittedData.week} · {submittedData.store}<br/>
