@@ -1,7 +1,5 @@
 import { useState, useMemo } from "react";
 
-
-// ── ITEM MASTER ───────────────────────────────────────────────────────────────
 const ITEM_MASTER = [
   {id:1,   name:'Bacon Bits Real Cooked .375" Gas Flushed',                    packSize:'2/5 lb',        cat:'Beef & Pork',         loc:'Walk-In',     uom:'lb'},
   {id:2,   name:'Bacon Precooked Thick Slice',                                  packSize:'2/150 ct',      cat:'Beef & Pork',         loc:'Walk-In',     uom:'Count'},
@@ -124,7 +122,6 @@ const ITEM_MASTER = [
 const ALL_CATS = [...new Set(ITEM_MASTER.map(i => i.cat))];
 const ALL_LOCS = [...new Set(ITEM_MASTER.map(i => i.loc))];
 
-// ── SIMPLE UUID for session tracking ─────────────────────────────────────────
 function uuid() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
     const r = Math.random() * 16 | 0;
@@ -132,38 +129,33 @@ function uuid() {
   });
 }
 
-// ── SUPABASE SUBMIT ───────────────────────────────────────────────────────────
 async function submitToSupabase(supabaseUrl, anonKey, payload) {
   const { storeName, submitter, weekNumber, weekDate, period, counts, sessionId } = payload;
   const submittedAt = new Date().toISOString();
-
-  // Build one row per counted item
   const rows = counts.map(item => ({
     submitted_at: submittedAt,
-    store_name:   storeName,
+    store_name: storeName,
     submitter,
-    week_number:  weekNumber,
-    week_date:    weekDate || null,
-    period:       period || null,
-    item_name:    item.name,
-    category:     item.cat,
-    location:     item.loc,
-    uom:          item.uom,
-    count:        item.count,
-    session_id:   sessionId,
+    week_number: weekNumber,
+    week_date: weekDate || null,
+    period: period || null,
+    item_name: item.name,
+    category: item.cat,
+    location: item.loc,
+    uom: item.uom,
+    count: item.count,
+    session_id: sessionId,
   }));
-
   const resp = await fetch(`${supabaseUrl}/rest/v1/inventory_submissions`, {
     method: 'POST',
     headers: {
-      'Content-Type':  'application/json',
-      'apikey':        anonKey,
+      'Content-Type': 'application/json',
+      'apikey': anonKey,
       'Authorization': `Bearer ${anonKey}`,
-      'Prefer':        'return=minimal',
+      'Prefer': 'return=minimal',
     },
     body: JSON.stringify(rows),
   });
-
   if (!resp.ok) {
     const err = await resp.text();
     throw new Error(`Supabase error ${resp.status}: ${err}`);
@@ -171,7 +163,6 @@ async function submitToSupabase(supabaseUrl, anonKey, payload) {
   return rows.length;
 }
 
-// ── ICONS ─────────────────────────────────────────────────────────────────────
 const IconCheck  = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>;
 const IconMinus  = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"/></svg>;
 const IconPlus   = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
@@ -184,65 +175,17 @@ function Stepper({ value, onChange }) {
   const counted = value != null && value !== "";
   return (
     <div style={{ display:"flex", alignItems:"center", gap:5 }}>
-      <button onClick={() => onChange(Math.max(0,(value||0)-1))} style={btnSm("#e5e7eb","#374151")}><IconMinus/></button>
+      <button onClick={() => onChange(Math.max(0,(value||0)-1))} style={{ width:30, height:30, borderRadius:7, border:"none", background:"#e5e7eb", color:"#374151", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}><IconMinus/></button>
       <input
         type="number" min="0" value={value??""} placeholder="—"
         onChange={e => { const v=e.target.value; onChange(v===""?undefined:Math.max(0,Number(v))); }}
         style={{ width:52, textAlign:"center", border:"1.5px solid", borderColor:counted?"#ef4444":"#d1d5db", borderRadius:8, padding:"6px 2px", fontSize:15, fontWeight:700, color:counted?"#111":"#9ca3af", background:counted?"#fff7f7":"#f9fafb", outline:"none" }}
       />
-      <button onClick={() => onChange((value||0)+1)} style={btnSm("#ef4444","#fff")}><IconPlus/></button>
-
-      {/* ── SUBMITTED VIEW ── */}
-      {view==="submitted" && submittedData && (
-        <div style={{ padding:"24px 16px", display:"flex", flexDirection:"column", alignItems:"center" }}>
-          {/* Success mark */}
-          <div style={{ width:72, height:72, borderRadius:36, background:"#052e16", border:"2px solid #16a34a", display:"flex", alignItems:"center", justifyContent:"center", marginBottom:16, marginTop:8 }}>
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-          </div>
-          <div style={{ fontSize:22, fontWeight:900, color:"#f9fafb", letterSpacing:"-0.5px", marginBottom:4 }}>Submitted!</div>
-          <div style={{ fontSize:13, color:"#6b7280", marginBottom:24, textAlign:"center" }}>
-            Week {submittedData.week} · {submittedData.store}<br/>
-            {submittedData.count} items · {submittedData.ts}
-          </div>
-
-          {/* Category summary */}
-          <div style={{ width:"100%", maxWidth:400, background:"#1a1a1a", borderRadius:14, overflow:"hidden", border:"1px solid #2a2a2a", marginBottom:20 }}>
-            <div style={{ padding:"12px 16px", borderBottom:"1px solid #2a2a2a", fontSize:11, fontWeight:700, color:"#6b7280", textTransform:"uppercase", letterSpacing:1 }}>
-              Items counted by category
-            </div>
-            {Object.entries(submittedData.catTotals).map(([cat, s]) => (
-              <div key={cat} style={{ display:"flex", justifyContent:"space-between", padding:"10px 16px", borderBottom:"1px solid #1f1f1f" }}>
-                <span style={{ fontSize:13, color:"#d1d5db" }}>{cat}</span>
-                <span style={{ fontSize:13, fontWeight:700, color:"#ef4444" }}>{s.items}</span>
-              </div>
-            ))}
-            <div style={{ display:"flex", justifyContent:"space-between", padding:"12px 16px", background:"#111" }}>
-              <span style={{ fontSize:13, fontWeight:700, color:"#f9fafb" }}>Total</span>
-              <span style={{ fontSize:13, fontWeight:800, color:"#ef4444" }}>{submittedData.count}</span>
-            </div>
-          </div>
-
-          {/* Actions */}
-          <button
-            onClick={() => { setCounts({}); setSubmittedData(null); setView("count"); }}
-            style={{ width:"100%", maxWidth:400, padding:"14px", borderRadius:11, border:"none", cursor:"pointer", fontWeight:800, fontSize:15, background:"#ef4444", color:"#fff", marginBottom:10 }}
-          >
-            Start New Count
-          </button>
-          <button
-            onClick={() => { setSubmittedData(null); setView("review"); }}
-            style={{ width:"100%", maxWidth:400, padding:"11px", borderRadius:11, border:"1px solid #2a2a2a", cursor:"pointer", fontWeight:600, fontSize:13, background:"transparent", color:"#9ca3af" }}
-          >
-            Back to Review
-          </button>
-        </div>
-      )}
+      <button onClick={() => onChange((value||0)+1)} style={{ width:30, height:30, borderRadius:7, border:"none", background:"#ef4444", color:"#fff", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}><IconPlus/></button>
     </div>
   );
 }
-function btnSm(bg,color){ return { width:30, height:30, borderRadius:7, border:"none", background:bg, color, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }; }
 
-// ── APP ───────────────────────────────────────────────────────────────────────
 export default function App() {
   const [counts,      setCounts]      = useState({});
   const [search,      setSearch]      = useState("");
@@ -260,20 +203,20 @@ export default function App() {
   const [submitting,  setSubmitting]  = useState(false);
   const [lastSubmit,  setLastSubmit]  = useState(null);
   const [submittedData, setSubmittedData] = useState(null);
-  const [sessionId]                   = useState(uuid());
+  const [sessionId]                   = useState(uuid);
 
-  const setCount = (id,val) => setCounts(prev=>({...prev,[id]:val}));
+  const setCount = (id, val) => setCounts(prev => ({ ...prev, [id]: val }));
 
   const showToast = (msg, type="info", dur=3000) => {
-    setToast({msg, type});
+    setToast({ msg, type });
     setTimeout(() => setToast(null), dur);
   };
 
   const filtered = useMemo(() => ITEM_MASTER.filter(item => {
     const q = search.toLowerCase();
     return (item.name.toLowerCase().includes(q) || item.packSize.toLowerCase().includes(q))
-      && (filterCat==="All" || item.cat===filterCat)
-      && (filterLoc==="All" || item.loc===filterLoc);
+      && (filterCat === "All" || item.cat === filterCat)
+      && (filterLoc === "All" || item.loc === filterLoc);
   }), [search, filterCat, filterLoc]);
 
   const grouped = useMemo(() => {
@@ -285,44 +228,36 @@ export default function App() {
     return map;
   }, [filtered]);
 
-  const countedItems = ITEM_MASTER.filter(i => counts[i.id]!=null && counts[i.id]!=="");
-  const uncounted    = ITEM_MASTER.filter(i => counts[i.id]==null || counts[i.id]==="");
-  const pct = Math.round((countedItems.length / ITEM_MASTER.length) * 100);
-
-  const canSubmit = supabaseUrl && anonKey && storeName && submitter && countedItems.length > 0;
+  const countedItems = ITEM_MASTER.filter(i => counts[i.id] != null && counts[i.id] !== "");
+  const uncounted    = ITEM_MASTER.filter(i => counts[i.id] == null || counts[i.id] === "");
+  const pct          = Math.round((countedItems.length / ITEM_MASTER.length) * 100);
+  const canSubmit    = supabaseUrl && anonKey && storeName && submitter && countedItems.length > 0;
 
   async function handleSubmit() {
-    if (!supabaseUrl || !anonKey) { showToast("Add Supabase credentials in Settings first", "warn", 3500); setView("settings"); return; }
-    if (!storeName)   { showToast("Enter store name in Settings", "warn"); setView("settings"); return; }
-    if (!submitter)   { showToast("Enter your name in Settings", "warn"); setView("settings"); return; }
+    if (!supabaseUrl || !anonKey) { showToast("Add Supabase credentials in Settings", "warn", 3500); setView("settings"); return; }
+    if (!storeName)  { showToast("Enter store name in Settings", "warn"); setView("settings"); return; }
+    if (!submitter)  { showToast("Enter your name in Settings", "warn"); setView("settings"); return; }
     if (!countedItems.length) { showToast("No items counted yet", "warn"); return; }
 
     setSubmitting(true);
     try {
       const countsPayload = countedItems.map(item => ({
-        name:  item.name,
-        cat:   item.cat,
-        loc:   item.loc,
-        uom:   item.uom,
+        name: item.name, cat: item.cat, loc: item.loc, uom: item.uom,
         count: Number(counts[item.id]),
       }));
-
       const written = await submitToSupabase(supabaseUrl, anonKey, {
         storeName, submitter, weekNumber, weekDate, period,
-        counts: countsPayload,
-        sessionId,
+        counts: countsPayload, sessionId,
       });
-
-      const ts = new Date().toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
+      const ts = new Date().toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
       setLastSubmit({ time: ts, week: weekNumber, count: written });
-      // Build summary for post-submit screen
       const catTotals = {};
       countedItems.forEach(item => {
-        if (!catTotals[item.cat]) catTotals[item.cat] = { items:0 };
+        if (!catTotals[item.cat]) catTotals[item.cat] = { items: 0 };
         catTotals[item.cat].items++;
       });
       setSubmittedData({ week: weekNumber, store: storeName, submitter, ts, count: written, catTotals, weekDate });
-      setView('submitted');
+      setView("submitted");
     } catch(err) {
       showToast(`Submit failed: ${err.message}`, "error", 6000);
     }
@@ -331,19 +266,19 @@ export default function App() {
 
   function downloadCSV() {
     const rows = [["Store","Week","Period","Submitter","Item","Category","Location","UOM","Count","Date"]];
-    const ts = new Date().toISOString().slice(0,10);
+    const ts = new Date().toISOString().slice(0, 10);
     countedItems.forEach(item => {
       rows.push([storeName, weekNumber, period, submitter, item.name, item.cat, item.loc, item.uom, counts[item.id], ts]);
     });
     const csv = rows.map(r => r.map(c => `"${c ?? ''}"`).join(",")).join("\n");
-    const blob = new Blob([csv], {type:"text/csv"});
+    const blob = new Blob([csv], { type: "text/csv" });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement("a");
     a.href = url;
-    a.download = `Melty_${storeName||"Store"}_Week${weekNumber}_${ts}.csv`;
+    a.download = `Melty_${storeName || "Store"}_Week${weekNumber}_${ts}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    showToast("CSV downloaded", "info");
+    showToast("CSV downloaded");
   }
 
   const toastBg = { info:"#1a1a1a", success:"#15803d", warn:"#d97706", error:"#dc2626" };
@@ -353,7 +288,6 @@ export default function App() {
   return (
     <div style={{ minHeight:"100vh", background:"#f3f4f6", fontFamily:"'Inter',system-ui,sans-serif", paddingBottom:80 }}>
 
-      {/* TOAST */}
       {toast && (
         <div style={{ position:"fixed", top:16, left:"50%", transform:"translateX(-50%)", background:toastBg[toast.type]||"#1a1a1a", color:"#fff", padding:"10px 20px", borderRadius:20, fontSize:13, fontWeight:600, zIndex:999, boxShadow:"0 4px 16px rgba(0,0,0,.3)", maxWidth:"88vw", textAlign:"center" }}>
           {toast.msg}
@@ -366,7 +300,7 @@ export default function App() {
           <div>
             <div style={{ color:"#ef4444", fontWeight:900, fontSize:22, letterSpacing:"-1px" }}>MELTY</div>
             <div style={{ color:"#6b7280", fontSize:11, marginTop:1 }}>
-              {storeName||"Set store in Settings"} · Week {weekNumber}{submitter ? ` · ${submitter}` : ""}
+              {storeName || "Set store in Settings"} · Week {weekNumber}{submitter ? ` · ${submitter}` : ""}
             </div>
           </div>
           <div style={{ textAlign:"right" }}>
@@ -381,97 +315,81 @@ export default function App() {
 
       {/* TABS */}
       <div style={{ display:"flex", background:"#fff", borderBottom:"1px solid #e5e7eb", position:"sticky", top:88, zIndex:40 }}>
-        {[["count","Count"],["review","Review"],["settings","Settings"]].map(([key,label]) => {
-          const badge = key==="review" ? countedItems.length : null;
+        {[["count","Count"],["review","Review"],["settings","Settings"]].map(([key, label]) => {
+          const badge = key === "review" ? countedItems.length : null;
           return (
-            <button key={key} onClick={()=>setView(key)} style={{ flex:1, padding:"10px 4px", fontSize:12, fontWeight:view===key?700:500, color:view===key?"#ef4444":"#6b7280", background:"none", border:"none", borderBottom:view===key?"2px solid #ef4444":"2px solid transparent", cursor:"pointer" }}>
-              {label}{badge!=null && <span style={{ display:"inline-flex", alignItems:"center", justifyContent:"center", width:16, height:16, borderRadius:8, background:badge>0?"#ef4444":"#e5e7eb", color:badge>0?"#fff":"#9ca3af", fontSize:9, fontWeight:700, marginLeft:4 }}>{badge}</span>}
+            <button key={key} onClick={() => setView(key)} style={{ flex:1, padding:"10px 4px", fontSize:12, fontWeight:view===key?700:500, color:view===key?"#ef4444":"#6b7280", background:"none", border:"none", borderBottom:view===key?"2px solid #ef4444":"2px solid transparent", cursor:"pointer" }}>
+              {label}{badge != null && <span style={{ display:"inline-flex", alignItems:"center", justifyContent:"center", width:16, height:16, borderRadius:8, background:badge>0?"#ef4444":"#e5e7eb", color:badge>0?"#fff":"#9ca3af", fontSize:9, fontWeight:700, marginLeft:4 }}>{badge}</span>}
             </button>
           );
         })}
       </div>
 
-      {/* ── COUNT TAB ── */}
-      {view==="count" && <>
-        <div style={{ display:"flex", alignItems:"center", gap:8, padding:"9px 12px", background:"#fff", borderBottom:"1px solid #f0f0f0" }}>
-          <IconSearch/>
-          <input style={{ flex:1, border:"none", outline:"none", fontSize:14, background:"transparent" }} placeholder="Search items or pack size…" value={search} onChange={e=>setSearch(e.target.value)}/>
-          {search && <button onClick={()=>setSearch("")} style={{ background:"none", border:"none", color:"#9ca3af", cursor:"pointer", fontSize:16 }}>✕</button>}
-        </div>
-        <div style={{ display:"flex", gap:6, padding:"8px 12px", overflowX:"auto", background:"#fff", borderBottom:"1px solid #f0f0f0" }}>
-          {["All",...ALL_CATS].map(c=><button key={c} onClick={()=>setFilterCat(c)} style={{ padding:"4px 10px", borderRadius:20, fontSize:11, fontWeight:600, border:"none", cursor:"pointer", whiteSpace:"nowrap", background:filterCat===c?"#ef4444":"#f3f4f6", color:filterCat===c?"#fff":"#374151" }}>{c}</button>)}
-        </div>
-        <div style={{ display:"flex", gap:6, padding:"6px 12px", overflowX:"auto", background:"#fafafa", borderBottom:"2px solid #e5e7eb" }}>
-          {["All",...ALL_LOCS].map(l=><button key={l} onClick={()=>setFilterLoc(l)} style={{ padding:"3px 10px", borderRadius:20, fontSize:11, fontWeight:600, border:"none", cursor:"pointer", whiteSpace:"nowrap", background:filterLoc===l?"#1a1a1a":"#f3f4f6", color:filterLoc===l?"#fff":"#374151" }}>{l}</button>)}
-        </div>
-        <div style={{ padding:"0 12px 12px" }}>
-          {Object.keys(grouped).length===0 && <div style={{ textAlign:"center", color:"#9ca3af", padding:40 }}>No items match.</div>}
-          {Object.entries(grouped).map(([cat, catItems]) => (
-            <div key={cat}>
-              <div style={{ fontSize:10, fontWeight:700, color:"#ef4444", textTransform:"uppercase", letterSpacing:1.2, padding:"14px 0 6px", display:"flex", justifyContent:"space-between" }}>
-                <span>{cat}</span>
-                <span style={{ color:"#9ca3af", fontWeight:400, textTransform:"none" }}>
-                  {catItems.filter(i=>counts[i.id]!=null&&counts[i.id]!=="").length}/{catItems.length}
-                </span>
-              </div>
-              {catItems.map(item => {
-                const counted = counts[item.id]!=null && counts[item.id]!=="";
-                return (
-                  <div key={item.id} style={{ background:"#fff", borderRadius:10, padding:"10px 12px", marginBottom:6, display:"flex", justifyContent:"space-between", alignItems:"center", boxShadow:counted?"0 0 0 1.5px #fca5a5":"0 1px 2px rgba(0,0,0,.06)" }}>
-                    <div style={{ flex:1, minWidth:0, marginRight:10 }}>
-                      <div style={{ fontSize:13, fontWeight:600, color:"#111", display:"flex", alignItems:"center", gap:5 }}>
-                        {counted && <span style={{ color:"#ef4444", flexShrink:0 }}><IconCheck/></span>}
-                        <span style={{ overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{item.name}</span>
+      {/* COUNT TAB */}
+      {view === "count" && (
+        <>
+          <div style={{ display:"flex", alignItems:"center", gap:8, padding:"9px 12px", background:"#fff", borderBottom:"1px solid #f0f0f0" }}>
+            <IconSearch/>
+            <input style={{ flex:1, border:"none", outline:"none", fontSize:14, background:"transparent" }} placeholder="Search items or pack size…" value={search} onChange={e => setSearch(e.target.value)}/>
+            {search && <button onClick={() => setSearch("")} style={{ background:"none", border:"none", color:"#9ca3af", cursor:"pointer", fontSize:16 }}>✕</button>}
+          </div>
+          <div style={{ display:"flex", gap:6, padding:"8px 12px", overflowX:"auto", background:"#fff", borderBottom:"1px solid #f0f0f0" }}>
+            {["All", ...ALL_CATS].map(c => <button key={c} onClick={() => setFilterCat(c)} style={{ padding:"4px 10px", borderRadius:20, fontSize:11, fontWeight:600, border:"none", cursor:"pointer", whiteSpace:"nowrap", background:filterCat===c?"#ef4444":"#f3f4f6", color:filterCat===c?"#fff":"#374151" }}>{c}</button>)}
+          </div>
+          <div style={{ display:"flex", gap:6, padding:"6px 12px", overflowX:"auto", background:"#fafafa", borderBottom:"2px solid #e5e7eb" }}>
+            {["All", ...ALL_LOCS].map(l => <button key={l} onClick={() => setFilterLoc(l)} style={{ padding:"3px 10px", borderRadius:20, fontSize:11, fontWeight:600, border:"none", cursor:"pointer", whiteSpace:"nowrap", background:filterLoc===l?"#1a1a1a":"#f3f4f6", color:filterLoc===l?"#fff":"#374151" }}>{l}</button>)}
+          </div>
+          <div style={{ padding:"0 12px 12px" }}>
+            {Object.keys(grouped).length === 0 && <div style={{ textAlign:"center", color:"#9ca3af", padding:40 }}>No items match.</div>}
+            {Object.entries(grouped).map(([cat, catItems]) => (
+              <div key={cat}>
+                <div style={{ fontSize:10, fontWeight:700, color:"#ef4444", textTransform:"uppercase", letterSpacing:1.2, padding:"14px 0 6px", display:"flex", justifyContent:"space-between" }}>
+                  <span>{cat}</span>
+                  <span style={{ color:"#9ca3af", fontWeight:400, textTransform:"none" }}>{catItems.filter(i => counts[i.id] != null && counts[i.id] !== "").length}/{catItems.length}</span>
+                </div>
+                {catItems.map(item => {
+                  const counted = counts[item.id] != null && counts[item.id] !== "";
+                  return (
+                    <div key={item.id} style={{ background:"#fff", borderRadius:10, padding:"10px 12px", marginBottom:6, display:"flex", justifyContent:"space-between", alignItems:"center", boxShadow:counted?"0 0 0 1.5px #fca5a5":"0 1px 2px rgba(0,0,0,.06)" }}>
+                      <div style={{ flex:1, minWidth:0, marginRight:10 }}>
+                        <div style={{ fontSize:13, fontWeight:600, color:"#111", display:"flex", alignItems:"center", gap:5 }}>
+                          {counted && <span style={{ color:"#ef4444", flexShrink:0 }}><IconCheck/></span>}
+                          <span style={{ overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{item.name}</span>
+                        </div>
+                        <div style={{ fontSize:10, color:"#9ca3af", marginTop:2 }}>{item.packSize} · {item.uom} · {item.loc}</div>
                       </div>
-                      <div style={{ fontSize:10, color:"#9ca3af", marginTop:2 }}>{item.packSize} · {item.uom} · {item.loc}</div>
+                      <Stepper value={counts[item.id]} onChange={val => setCount(item.id, val)}/>
                     </div>
-                    <Stepper value={counts[item.id]} onChange={val=>setCount(item.id,val)}/>
-                  </div>
-                );
-              })}
-            </div>
-          ))}
-        </div>
-      </>}
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
-      {/* ── REVIEW TAB ── */}
-      {view==="review" && (
+      {/* REVIEW TAB */}
+      {view === "review" && (
         <div style={{ padding:"12px 12px 20px" }}>
-
-          {/* SUBMIT */}
-          <div style={{ background:"#fff", borderRadius:14, padding:16, marginBottom:10, boxShadow:"0 1px 4px rgba(0,0,0,.08)", border:`1.5px solid ${canSubmit?"#fca5a5":"#e5e7eb"}` }}>
+          <div style={{ background:"#fff", borderRadius:14, padding:16, marginBottom:10, boxShadow:"0 1px 4px rgba(0,0,0,.08)", border:`1.5px solid ${canSubmit ? "#fca5a5" : "#e5e7eb"}` }}>
             <div style={{ fontSize:13, fontWeight:700, color:"#111", marginBottom:4 }}>Submit to Melty</div>
             <div style={{ fontSize:11, color:"#6b7280", marginBottom:12, lineHeight:1.5 }}>
-              {canSubmit
-                ? `Ready — ${countedItems.length} items counted for ${storeName} Week ${weekNumber}.`
-                : "Complete Settings (name, store, and Supabase credentials) before submitting."}
+              {canSubmit ? `Ready — ${countedItems.length} items counted for ${storeName} Week ${weekNumber}.` : "Complete Settings (name, store, Supabase credentials) to enable submit."}
             </div>
-            <button
-              onClick={handleSubmit}
-              disabled={submitting}
-              style={{ width:"100%", padding:"14px", borderRadius:11, border:"none", cursor:canSubmit?"pointer":"not-allowed", fontWeight:800, fontSize:15, background:canSubmit?"#ef4444":"#e5e7eb", color:canSubmit?"#fff":"#9ca3af", display:"flex", alignItems:"center", justifyContent:"center", gap:8, opacity:submitting?.6:1, transition:"all .15s" }}
-            >
+            <button onClick={handleSubmit} disabled={submitting} style={{ width:"100%", padding:"14px", borderRadius:11, border:"none", cursor:canSubmit?"pointer":"not-allowed", fontWeight:800, fontSize:15, background:canSubmit?"#ef4444":"#e5e7eb", color:canSubmit?"#fff":"#9ca3af", display:"flex", alignItems:"center", justifyContent:"center", gap:8, opacity:submitting?.6:1 }}>
               {submitting ? "Submitting…" : <><IconSend/> Submit Week {weekNumber}</>}
             </button>
-            {lastSubmit && (
-              <div style={{ marginTop:10, fontSize:11, color:"#15803d", textAlign:"center", fontWeight:600 }}>
-                ✓ Last submitted: Week {lastSubmit.week} · {lastSubmit.count} items · {lastSubmit.time}
-              </div>
-            )}
+            {lastSubmit && <div style={{ marginTop:10, fontSize:11, color:"#15803d", textAlign:"center", fontWeight:600 }}>✓ Last submitted: Week {lastSubmit.week} · {lastSubmit.count} items · {lastSubmit.time}</div>}
           </div>
-
-          {/* CSV backup */}
           <button onClick={downloadCSV} style={{ width:"100%", padding:"11px", borderRadius:10, border:"none", cursor:"pointer", fontWeight:600, fontSize:12, background:"#1a1a1a", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", gap:6, marginBottom:10 }}>
             <IconDown/> Download CSV (backup)
           </button>
-
-          <button onClick={()=>{ if(window.confirm("Clear all counts for this session?")){ setCounts({}); showToast("Counts cleared"); }}} style={{ width:"100%", marginBottom:14, padding:"9px", borderRadius:8, border:"1px solid #e5e7eb", background:"#fff", color:"#6b7280", fontSize:12, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:5 }}>
+          <button onClick={() => { if(window.confirm("Clear all counts?")) { setCounts({}); showToast("Counts cleared"); } }} style={{ width:"100%", marginBottom:14, padding:"9px", borderRadius:8, border:"1px solid #e5e7eb", background:"#fff", color:"#6b7280", fontSize:12, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:5 }}>
             <IconReset/> Clear All Counts
           </button>
-
           {countedItems.length > 0 && <>
             <div style={{ fontSize:10, fontWeight:700, color:"#ef4444", textTransform:"uppercase", letterSpacing:1.2, padding:"4px 0 8px" }}>Counted ({countedItems.length})</div>
-            {countedItems.map(item=>(
+            {countedItems.map(item => (
               <div key={item.id} style={{ background:"#fff", borderRadius:9, padding:"9px 12px", marginBottom:5, display:"flex", justifyContent:"space-between", boxShadow:"0 1px 2px rgba(0,0,0,.06)" }}>
                 <div>
                   <div style={{ fontSize:12, fontWeight:600 }}>{item.name}</div>
@@ -481,10 +399,9 @@ export default function App() {
               </div>
             ))}
           </>}
-
           {uncounted.length > 0 && <>
             <div style={{ fontSize:10, fontWeight:700, color:"#9ca3af", textTransform:"uppercase", letterSpacing:1.2, padding:"12px 0 8px" }}>Not Yet Counted ({uncounted.length})</div>
-            {uncounted.map(item=>(
+            {uncounted.map(item => (
               <div key={item.id} style={{ background:"#f9fafb", borderRadius:9, padding:"9px 12px", marginBottom:4, display:"flex", justifyContent:"space-between", opacity:.6 }}>
                 <div style={{ fontSize:12, fontWeight:500, color:"#6b7280" }}>{item.name}</div>
                 <div style={{ fontSize:12, color:"#d1d5db" }}>—</div>
@@ -494,105 +411,19 @@ export default function App() {
         </div>
       )}
 
-      {/* ── SETTINGS TAB ── */}
-      {view==="settings" && (
-        <div style={{ padding:"12px" }}>
-
-          <div style={{ background:"#fff", borderRadius:10, padding:14, marginBottom:10, boxShadow:"0 1px 3px rgba(0,0,0,.06)" }}>
-            <div style={{ fontSize:12, fontWeight:700, color:"#374151", marginBottom:10 }}>Session Info</div>
-            <label style={lbl}>Your Name</label>
-            <input value={submitter} onChange={e=>setSubmitter(e.target.value)} placeholder="e.g. Sarah M." style={inp}/>
-            <label style={lbl}>Store / Location</label>
-            <input value={storeName} onChange={e=>setStoreName(e.target.value)} placeholder="e.g. Bristol" style={inp}/>
-            <label style={lbl}>Period (optional)</label>
-            <input value={period} onChange={e=>setPeriod(e.target.value)} placeholder="e.g. Period 7 2026" style={inp}/>
-            <label style={lbl}>Week Number</label>
-            <div style={{ display:"flex", gap:8, marginBottom:10 }}>
-              {[1,2,3,4].map(w=>(
-                <button key={w} onClick={()=>setWeekNumber(w)} style={{ flex:1, padding:"9px", borderRadius:8, border:"1.5px solid", borderColor:weekNumber===w?"#ef4444":"#e5e7eb", background:weekNumber===w?"#fff7f7":"#fff", color:weekNumber===w?"#ef4444":"#6b7280", fontWeight:700, fontSize:13, cursor:"pointer" }}>
-                  {w}
-                </button>
-              ))}
-            </div>
-            <label style={lbl}>Week Ending Date</label>
-            <input value={weekDate} onChange={e=>setWeekDate(e.target.value)} placeholder="e.g. Jun 21, 2026" style={inp}/>
-          </div>
-
-          <div style={{ background:"#fff", borderRadius:10, padding:14, marginBottom:10, boxShadow:"0 1px 3px rgba(0,0,0,.06)" }}>
-            <div style={{ fontSize:12, fontWeight:700, color:"#374151", marginBottom:4 }}>Supabase Connection</div>
-            <div style={{ fontSize:11, color:"#6b7280", marginBottom:10, lineHeight:1.5 }}>
-              Paste your Supabase Project URL and anon public key. These are the same for every franchisee — set once and forget.
-            </div>
-            <label style={lbl}>Project URL</label>
-            <input
-              value={supabaseUrl}
-              onChange={e=>{ const v=e.target.value.trim(); setSupabaseUrl(v); localStorage.setItem('melty_supabase_url',v); }}
-              placeholder="https://xxxx.supabase.co"
-              style={{ ...inp, fontFamily:"monospace", fontSize:11 }}
-            />
-            <label style={lbl}>Anon Public Key</label>
-            <input
-              value={anonKey}
-              onChange={e=>{ const v=e.target.value.trim(); setAnonKey(v); localStorage.setItem('melty_anon_key',v); }}
-              placeholder="eyJhbGciOiJIUzI1NiIs..."
-              style={{ ...inp, fontFamily:"monospace", fontSize:11 }}
-            />
-            {supabaseUrl && anonKey && (
-              <button
-                onClick={async () => {
-                  try {
-                    const resp = await fetch(`${supabaseUrl}/rest/v1/inventory_submissions?limit=1`, {
-                      headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}` }
-                    });
-                    if (resp.ok || resp.status === 406) {
-                      showToast("✓ Connected to Supabase", "success");
-                    } else {
-                      showToast(`Connection issue: ${resp.status}`, "warn");
-                    }
-                  } catch(e) {
-                    showToast("Could not reach Supabase — check URL", "error");
-                  }
-                }}
-                style={{ fontSize:11, color:"#ef4444", background:"none", border:"none", cursor:"pointer", padding:0, fontWeight:600 }}
-              >
-                Test connection →
-              </button>
-            )}
-          </div>
-
-          <div style={{ padding:12, background:canSubmit?"#f0fdf4":"#fef2f2", borderRadius:10, border:`1px solid ${canSubmit?"#bbf7d0":"#fecaca"}` }}>
-            <div style={{ fontSize:11, fontWeight:700, color:canSubmit?"#15803d":"#dc2626", marginBottom:4 }}>
-              {canSubmit ? "✓ Ready to submit" : "⚠ Setup incomplete"}
-            </div>
-            <div style={{ fontSize:11, color:"#6b7280", lineHeight:1.8 }}>
-              {!submitter    && "• Your name required\n"}
-              {!storeName    && "• Store name required\n"}
-              {!supabaseUrl  && "• Supabase URL required\n"}
-              {!anonKey      && "• Supabase anon key required\n"}
-              {canSubmit     && `${countedItems.length} items counted — go to Review tab to submit.`}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── SUBMITTED VIEW ── */}
-      {view==="submitted" && submittedData && (
+      {/* SUBMITTED VIEW */}
+      {view === "submitted" && submittedData && (
         <div style={{ padding:"24px 16px", display:"flex", flexDirection:"column", alignItems:"center" }}>
-          {/* Success mark */}
           <div style={{ width:72, height:72, borderRadius:36, background:"#052e16", border:"2px solid #16a34a", display:"flex", alignItems:"center", justifyContent:"center", marginBottom:16, marginTop:8 }}>
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
           </div>
-          <div style={{ fontSize:22, fontWeight:900, color:"#f9fafb", letterSpacing:"-0.5px", marginBottom:4 }}>Submitted!</div>
+          <div style={{ fontSize:22, fontWeight:900, color:"#111", letterSpacing:"-0.5px", marginBottom:4 }}>Submitted!</div>
           <div style={{ fontSize:13, color:"#6b7280", marginBottom:24, textAlign:"center" }}>
             Week {submittedData.week} · {submittedData.store}<br/>
             {submittedData.count} items · {submittedData.ts}
           </div>
-
-          {/* Category summary */}
           <div style={{ width:"100%", maxWidth:400, background:"#1a1a1a", borderRadius:14, overflow:"hidden", border:"1px solid #2a2a2a", marginBottom:20 }}>
-            <div style={{ padding:"12px 16px", borderBottom:"1px solid #2a2a2a", fontSize:11, fontWeight:700, color:"#6b7280", textTransform:"uppercase", letterSpacing:1 }}>
-              Items counted by category
-            </div>
+            <div style={{ padding:"12px 16px", borderBottom:"1px solid #2a2a2a", fontSize:11, fontWeight:700, color:"#6b7280", textTransform:"uppercase", letterSpacing:1 }}>Items by category</div>
             {Object.entries(submittedData.catTotals).map(([cat, s]) => (
               <div key={cat} style={{ display:"flex", justifyContent:"space-between", padding:"10px 16px", borderBottom:"1px solid #1f1f1f" }}>
                 <span style={{ fontSize:13, color:"#d1d5db" }}>{cat}</span>
@@ -604,20 +435,60 @@ export default function App() {
               <span style={{ fontSize:13, fontWeight:800, color:"#ef4444" }}>{submittedData.count}</span>
             </div>
           </div>
-
-          {/* Actions */}
-          <button
-            onClick={() => { setCounts({}); setSubmittedData(null); setView("count"); }}
-            style={{ width:"100%", maxWidth:400, padding:"14px", borderRadius:11, border:"none", cursor:"pointer", fontWeight:800, fontSize:15, background:"#ef4444", color:"#fff", marginBottom:10 }}
-          >
+          <button onClick={() => { setCounts({}); setSubmittedData(null); setView("count"); }} style={{ width:"100%", maxWidth:400, padding:"14px", borderRadius:11, border:"none", cursor:"pointer", fontWeight:800, fontSize:15, background:"#ef4444", color:"#fff", marginBottom:10 }}>
             Start New Count
           </button>
-          <button
-            onClick={() => { setSubmittedData(null); setView("review"); }}
-            style={{ width:"100%", maxWidth:400, padding:"11px", borderRadius:11, border:"1px solid #2a2a2a", cursor:"pointer", fontWeight:600, fontSize:13, background:"transparent", color:"#9ca3af" }}
-          >
+          <button onClick={() => { setSubmittedData(null); setView("review"); }} style={{ width:"100%", maxWidth:400, padding:"11px", borderRadius:11, border:"1px solid #e5e7eb", cursor:"pointer", fontWeight:600, fontSize:13, background:"#fff", color:"#6b7280" }}>
             Back to Review
           </button>
+        </div>
+      )}
+
+      {/* SETTINGS TAB */}
+      {view === "settings" && (
+        <div style={{ padding:"12px" }}>
+          <div style={{ background:"#fff", borderRadius:10, padding:14, marginBottom:10, boxShadow:"0 1px 3px rgba(0,0,0,.06)" }}>
+            <div style={{ fontSize:12, fontWeight:700, color:"#374151", marginBottom:10 }}>Session Info</div>
+            <label style={lbl}>Your Name</label>
+            <input value={submitter} onChange={e => setSubmitter(e.target.value)} placeholder="e.g. Sarah M." style={inp}/>
+            <label style={lbl}>Store / Location</label>
+            <input value={storeName} onChange={e => setStoreName(e.target.value)} placeholder="e.g. Bristol" style={inp}/>
+            <label style={lbl}>Period (optional)</label>
+            <input value={period} onChange={e => setPeriod(e.target.value)} placeholder="e.g. Period 7 2026" style={inp}/>
+            <label style={lbl}>Week Number</label>
+            <div style={{ display:"flex", gap:8, marginBottom:10 }}>
+              {[1,2,3,4].map(w => (
+                <button key={w} onClick={() => setWeekNumber(w)} style={{ flex:1, padding:"9px", borderRadius:8, border:"1.5px solid", borderColor:weekNumber===w?"#ef4444":"#e5e7eb", background:weekNumber===w?"#fff7f7":"#fff", color:weekNumber===w?"#ef4444":"#6b7280", fontWeight:700, fontSize:13, cursor:"pointer" }}>{w}</button>
+              ))}
+            </div>
+            <label style={lbl}>Week Ending Date</label>
+            <input value={weekDate} onChange={e => setWeekDate(e.target.value)} placeholder="e.g. Jun 21, 2026" style={inp}/>
+          </div>
+          <div style={{ background:"#fff", borderRadius:10, padding:14, marginBottom:10, boxShadow:"0 1px 3px rgba(0,0,0,.06)" }}>
+            <div style={{ fontSize:12, fontWeight:700, color:"#374151", marginBottom:4 }}>Supabase Connection</div>
+            <div style={{ fontSize:11, color:"#6b7280", marginBottom:10, lineHeight:1.5 }}>Paste your Supabase Project URL and anon public key.</div>
+            <label style={lbl}>Project URL</label>
+            <input value={supabaseUrl} onChange={e => { const v=e.target.value.trim(); setSupabaseUrl(v); localStorage.setItem('melty_supabase_url',v); }} placeholder="https://xxxx.supabase.co" style={{ ...inp, fontFamily:"monospace", fontSize:11 }}/>
+            <label style={lbl}>Anon Public Key</label>
+            <input value={anonKey} onChange={e => { const v=e.target.value.trim(); setAnonKey(v); localStorage.setItem('melty_anon_key',v); }} placeholder="eyJhbGci..." style={{ ...inp, fontFamily:"monospace", fontSize:11 }}/>
+            {supabaseUrl && anonKey && (
+              <button onClick={async () => {
+                try {
+                  const r = await fetch(`${supabaseUrl}/rest/v1/inventory_submissions?limit=1`, { headers:{ apikey:anonKey, Authorization:`Bearer ${anonKey}` } });
+                  showToast(r.ok || r.status===406 ? "✓ Connected" : `Status ${r.status}`, r.ok||r.status===406?"success":"warn");
+                } catch(e) { showToast("Cannot reach Supabase","error"); }
+              }} style={{ fontSize:11, color:"#ef4444", background:"none", border:"none", cursor:"pointer", padding:0, fontWeight:600 }}>
+                Test connection →
+              </button>
+            )}
+          </div>
+          <div style={{ padding:12, background:canSubmit?"#f0fdf4":"#fef2f2", borderRadius:10, border:`1px solid ${canSubmit?"#bbf7d0":"#fecaca"}` }}>
+            <div style={{ fontSize:11, fontWeight:700, color:canSubmit?"#15803d":"#dc2626", marginBottom:4 }}>{canSubmit?"✓ Ready to submit":"⚠ Setup incomplete"}</div>
+            <div style={{ fontSize:11, color:"#6b7280", lineHeight:1.8 }}>
+              {!submitter && "• Your name required\n"}{!storeName && "• Store name required\n"}{!supabaseUrl && "• Supabase URL required\n"}{!anonKey && "• Anon key required\n"}
+              {canSubmit && `${countedItems.length} items counted — go to Review to submit.`}
+            </div>
+          </div>
         </div>
       )}
     </div>
