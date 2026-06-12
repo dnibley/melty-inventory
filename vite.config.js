@@ -10,10 +10,10 @@ export default defineConfig({
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
         name: 'Melty Inventory',
-        short_name: 'Melty Inv',
-        description: 'Weekly inventory counting app for Melty locations',
-        theme_color: '#1a1a1a',
-        background_color: '#f3f4f6',
+        short_name: 'Melty',
+        description: 'Weekly inventory counting for Melty locations',
+        theme_color: '#1C1C1C',
+        background_color: '#1C1C1C',
         display: 'standalone',
         orientation: 'portrait',
         start_url: '/',
@@ -25,6 +25,5 @@ export default defineConfig({
       }
     })
   ],
-  // Serve index.html for all routes (SPA fallback)
   appType: 'spa',
 })
