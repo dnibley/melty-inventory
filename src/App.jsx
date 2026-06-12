@@ -190,6 +190,52 @@ function Stepper({ value, onChange }) {
         style={{ width:52, textAlign:"center", border:"1.5px solid", borderColor:counted?"#ef4444":"#d1d5db", borderRadius:8, padding:"6px 2px", fontSize:15, fontWeight:700, color:counted?"#111":"#9ca3af", background:counted?"#fff7f7":"#f9fafb", outline:"none" }}
       />
       <button onClick={() => onChange((value||0)+1)} style={btnSm("#ef4444","#fff")}><IconPlus/></button>
+
+      {/* ── SUBMITTED VIEW ── */}
+      {view==="submitted" && submittedData && (
+        <div style={{ padding:"24px 16px", display:"flex", flexDirection:"column", alignItems:"center" }}>
+          {/* Success mark */}
+          <div style={{ width:72, height:72, borderRadius:36, background:"#052e16", border:"2px solid #16a34a", display:"flex", alignItems:"center", justifyContent:"center", marginBottom:16, marginTop:8 }}>
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <div style={{ fontSize:22, fontWeight:900, color:"#f9fafb", letterSpacing:"-0.5px", marginBottom:4 }}>Submitted!</div>
+          <div style={{ fontSize:13, color:"#6b7280", marginBottom:24, textAlign:"center" }}>
+            Week {submittedData.week} · {submittedData.store}<br/>
+            {submittedData.count} items · {submittedData.ts}
+          </div>
+
+          {/* Category summary */}
+          <div style={{ width:"100%", maxWidth:400, background:"#1a1a1a", borderRadius:14, overflow:"hidden", border:"1px solid #2a2a2a", marginBottom:20 }}>
+            <div style={{ padding:"12px 16px", borderBottom:"1px solid #2a2a2a", fontSize:11, fontWeight:700, color:"#6b7280", textTransform:"uppercase", letterSpacing:1 }}>
+              Items counted by category
+            </div>
+            {Object.entries(submittedData.catTotals).map(([cat, s]) => (
+              <div key={cat} style={{ display:"flex", justifyContent:"space-between", padding:"10px 16px", borderBottom:"1px solid #1f1f1f" }}>
+                <span style={{ fontSize:13, color:"#d1d5db" }}>{cat}</span>
+                <span style={{ fontSize:13, fontWeight:700, color:"#ef4444" }}>{s.items}</span>
+              </div>
+            ))}
+            <div style={{ display:"flex", justifyContent:"space-between", padding:"12px 16px", background:"#111" }}>
+              <span style={{ fontSize:13, fontWeight:700, color:"#f9fafb" }}>Total</span>
+              <span style={{ fontSize:13, fontWeight:800, color:"#ef4444" }}>{submittedData.count}</span>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <button
+            onClick={() => { setCounts({}); setSubmittedData(null); setView("count"); }}
+            style={{ width:"100%", maxWidth:400, padding:"14px", borderRadius:11, border:"none", cursor:"pointer", fontWeight:800, fontSize:15, background:"#ef4444", color:"#fff", marginBottom:10 }}
+          >
+            Start New Count
+          </button>
+          <button
+            onClick={() => { setSubmittedData(null); setView("review"); }}
+            style={{ width:"100%", maxWidth:400, padding:"11px", borderRadius:11, border:"1px solid #2a2a2a", cursor:"pointer", fontWeight:600, fontSize:13, background:"transparent", color:"#9ca3af" }}
+          >
+            Back to Review
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -207,11 +253,12 @@ export default function App() {
   const [weekNumber,  setWeekNumber]  = useState(1);
   const [weekDate,    setWeekDate]    = useState("");
   const [period,      setPeriod]      = useState("");
-  const [supabaseUrl, setSupabaseUrl] = useState("");
-  const [anonKey,     setAnonKey]     = useState("");
+  const [supabaseUrl, setSupabaseUrl] = useState(() => localStorage.getItem('melty_supabase_url') || '');
+  const [anonKey,     setAnonKey]     = useState(() => localStorage.getItem('melty_anon_key') || '');
   const [toast,       setToast]       = useState(null);
   const [submitting,  setSubmitting]  = useState(false);
   const [lastSubmit,  setLastSubmit]  = useState(null);
+  const [submittedData, setSubmittedData] = useState(null);
   const [sessionId]                   = useState(uuid());
 
   const setCount = (id,val) => setCounts(prev=>({...prev,[id]:val}));
@@ -267,7 +314,14 @@ export default function App() {
 
       const ts = new Date().toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
       setLastSubmit({ time: ts, week: weekNumber, count: written });
-      showToast(`✓ ${written} items submitted for Week ${weekNumber}`, "success", 4000);
+      // Build summary for post-submit screen
+      const catTotals = {};
+      countedItems.forEach(item => {
+        if (!catTotals[item.cat]) catTotals[item.cat] = { items:0 };
+        catTotals[item.cat].items++;
+      });
+      setSubmittedData({ week: weekNumber, store: storeName, submitter, ts, count: written, catTotals, weekDate });
+      setView('submitted');
     } catch(err) {
       showToast(`Submit failed: ${err.message}`, "error", 6000);
     }
@@ -471,14 +525,14 @@ export default function App() {
             <label style={lbl}>Project URL</label>
             <input
               value={supabaseUrl}
-              onChange={e=>setSupabaseUrl(e.target.value.trim())}
+              onChange={e=>{ const v=e.target.value.trim(); setSupabaseUrl(v); localStorage.setItem('melty_supabase_url',v); }}
               placeholder="https://xxxx.supabase.co"
               style={{ ...inp, fontFamily:"monospace", fontSize:11 }}
             />
             <label style={lbl}>Anon Public Key</label>
             <input
               value={anonKey}
-              onChange={e=>setAnonKey(e.target.value.trim())}
+              onChange={e=>{ const v=e.target.value.trim(); setAnonKey(v); localStorage.setItem('melty_anon_key',v); }}
               placeholder="eyJhbGciOiJIUzI1NiIs..."
               style={{ ...inp, fontFamily:"monospace", fontSize:11 }}
             />
@@ -517,6 +571,52 @@ export default function App() {
               {canSubmit     && `${countedItems.length} items counted — go to Review tab to submit.`}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── SUBMITTED VIEW ── */}
+      {view==="submitted" && submittedData && (
+        <div style={{ padding:"24px 16px", display:"flex", flexDirection:"column", alignItems:"center" }}>
+          {/* Success mark */}
+          <div style={{ width:72, height:72, borderRadius:36, background:"#052e16", border:"2px solid #16a34a", display:"flex", alignItems:"center", justifyContent:"center", marginBottom:16, marginTop:8 }}>
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <div style={{ fontSize:22, fontWeight:900, color:"#f9fafb", letterSpacing:"-0.5px", marginBottom:4 }}>Submitted!</div>
+          <div style={{ fontSize:13, color:"#6b7280", marginBottom:24, textAlign:"center" }}>
+            Week {submittedData.week} · {submittedData.store}<br/>
+            {submittedData.count} items · {submittedData.ts}
+          </div>
+
+          {/* Category summary */}
+          <div style={{ width:"100%", maxWidth:400, background:"#1a1a1a", borderRadius:14, overflow:"hidden", border:"1px solid #2a2a2a", marginBottom:20 }}>
+            <div style={{ padding:"12px 16px", borderBottom:"1px solid #2a2a2a", fontSize:11, fontWeight:700, color:"#6b7280", textTransform:"uppercase", letterSpacing:1 }}>
+              Items counted by category
+            </div>
+            {Object.entries(submittedData.catTotals).map(([cat, s]) => (
+              <div key={cat} style={{ display:"flex", justifyContent:"space-between", padding:"10px 16px", borderBottom:"1px solid #1f1f1f" }}>
+                <span style={{ fontSize:13, color:"#d1d5db" }}>{cat}</span>
+                <span style={{ fontSize:13, fontWeight:700, color:"#ef4444" }}>{s.items}</span>
+              </div>
+            ))}
+            <div style={{ display:"flex", justifyContent:"space-between", padding:"12px 16px", background:"#111" }}>
+              <span style={{ fontSize:13, fontWeight:700, color:"#f9fafb" }}>Total</span>
+              <span style={{ fontSize:13, fontWeight:800, color:"#ef4444" }}>{submittedData.count}</span>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <button
+            onClick={() => { setCounts({}); setSubmittedData(null); setView("count"); }}
+            style={{ width:"100%", maxWidth:400, padding:"14px", borderRadius:11, border:"none", cursor:"pointer", fontWeight:800, fontSize:15, background:"#ef4444", color:"#fff", marginBottom:10 }}
+          >
+            Start New Count
+          </button>
+          <button
+            onClick={() => { setSubmittedData(null); setView("review"); }}
+            style={{ width:"100%", maxWidth:400, padding:"11px", borderRadius:11, border:"1px solid #2a2a2a", cursor:"pointer", fontWeight:600, fontSize:13, background:"transparent", color:"#9ca3af" }}
+          >
+            Back to Review
+          </button>
         </div>
       )}
     </div>
