@@ -1,5 +1,4 @@
 import { useState, useMemo } from "react";
-import * as XLSX from "xlsx";
 
 // ── ITEM MASTER ───────────────────────────────────────────────────────────────
 const ITEM_MASTER = [
@@ -124,6 +123,53 @@ const ITEM_MASTER = [
 const ALL_CATS = [...new Set(ITEM_MASTER.map(i => i.cat))];
 const ALL_LOCS = [...new Set(ITEM_MASTER.map(i => i.loc))];
 
+// ── SIMPLE UUID for session tracking ─────────────────────────────────────────
+function uuid() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+
+// ── SUPABASE SUBMIT ───────────────────────────────────────────────────────────
+async function submitToSupabase(supabaseUrl, anonKey, payload) {
+  const { storeName, submitter, weekNumber, weekDate, period, counts, sessionId } = payload;
+  const submittedAt = new Date().toISOString();
+
+  // Build one row per counted item
+  const rows = counts.map(item => ({
+    submitted_at: submittedAt,
+    store_name:   storeName,
+    submitter,
+    week_number:  weekNumber,
+    week_date:    weekDate || null,
+    period:       period || null,
+    item_name:    item.name,
+    category:     item.cat,
+    location:     item.loc,
+    uom:          item.uom,
+    count:        item.count,
+    session_id:   sessionId,
+  }));
+
+  const resp = await fetch(`${supabaseUrl}/rest/v1/inventory_submissions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      'apikey':        anonKey,
+      'Authorization': `Bearer ${anonKey}`,
+      'Prefer':        'return=minimal',
+    },
+    body: JSON.stringify(rows),
+  });
+
+  if (!resp.ok) {
+    const err = await resp.text();
+    throw new Error(`Supabase error ${resp.status}: ${err}`);
+  }
+  return rows.length;
+}
+
 // ── ICONS ─────────────────────────────────────────────────────────────────────
 const IconCheck  = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>;
 const IconMinus  = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"/></svg>;
@@ -132,7 +178,6 @@ const IconSearch = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="n
 const IconSend   = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>;
 const IconDown   = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>;
 const IconReset  = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg>;
-const IconWifi   = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>;
 
 function Stepper({ value, onChange }) {
   const counted = value != null && value !== "";
@@ -150,37 +195,28 @@ function Stepper({ value, onChange }) {
 }
 function btnSm(bg,color){ return { width:30, height:30, borderRadius:7, border:"none", background:bg, color, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }; }
 
-// ── SUBMIT TO GOOGLE SHEETS ───────────────────────────────────────────────────
-async function submitToSheet(endpointUrl, payload) {
-  // Google Apps Script requires no-cors for cross-origin POST
-  const resp = await fetch(endpointUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain' }, // avoids preflight
-    body: JSON.stringify(payload),
-    mode: 'no-cors',
-  });
-  // no-cors means we can't read the response — treat as success if no throw
-  return true;
-}
-
 // ── APP ───────────────────────────────────────────────────────────────────────
 export default function App() {
-  const [counts,     setCounts]     = useState({});
-  const [search,     setSearch]     = useState("");
-  const [filterCat,  setFilterCat]  = useState("All");
-  const [filterLoc,  setFilterLoc]  = useState("All");
-  const [view,       setView]       = useState("count");
-  const [storeName,  setStoreName]  = useState("");
-  const [submitter,  setSubmitter]  = useState("");
-  const [weekNumber, setWeekNumber] = useState(1);
-  const [weekDate,   setWeekDate]   = useState("");
-  const [endpointUrl,setEndpointUrl]= useState("");
-  const [toast,      setToast]      = useState(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [lastSubmit, setLastSubmit] = useState(null);
+  const [counts,      setCounts]      = useState({});
+  const [search,      setSearch]      = useState("");
+  const [filterCat,   setFilterCat]   = useState("All");
+  const [filterLoc,   setFilterLoc]   = useState("All");
+  const [view,        setView]        = useState("count");
+  const [storeName,   setStoreName]   = useState("");
+  const [submitter,   setSubmitter]   = useState("");
+  const [weekNumber,  setWeekNumber]  = useState(1);
+  const [weekDate,    setWeekDate]    = useState("");
+  const [period,      setPeriod]      = useState("");
+  const [supabaseUrl, setSupabaseUrl] = useState("");
+  const [anonKey,     setAnonKey]     = useState("");
+  const [toast,       setToast]       = useState(null);
+  const [submitting,  setSubmitting]  = useState(false);
+  const [lastSubmit,  setLastSubmit]  = useState(null);
+  const [sessionId]                   = useState(uuid());
 
   const setCount = (id,val) => setCounts(prev=>({...prev,[id]:val}));
-  const showToast = (msg, dur=3000, type="info") => {
+
+  const showToast = (msg, type="info", dur=3000) => {
     setToast({msg, type});
     setTimeout(() => setToast(null), dur);
   };
@@ -202,63 +238,61 @@ export default function App() {
   }, [filtered]);
 
   const countedItems = ITEM_MASTER.filter(i => counts[i.id]!=null && counts[i.id]!=="");
+  const uncounted    = ITEM_MASTER.filter(i => counts[i.id]==null || counts[i.id]==="");
   const pct = Math.round((countedItems.length / ITEM_MASTER.length) * 100);
-  const uncounted = ITEM_MASTER.filter(i => counts[i.id]==null || counts[i.id]==="");
 
-  const canSubmit = endpointUrl && storeName && submitter && countedItems.length > 0;
+  const canSubmit = supabaseUrl && anonKey && storeName && submitter && countedItems.length > 0;
 
   async function handleSubmit() {
-    if (!canSubmit) {
-      if (!endpointUrl) { showToast("Add your Google Sheets URL in Settings first", 3500, "warn"); setView("settings"); return; }
-      if (!storeName)   { showToast("Enter store name in Settings", 3000, "warn"); setView("settings"); return; }
-      if (!submitter)   { showToast("Enter your name in Settings", 3000, "warn"); setView("settings"); return; }
-      return;
-    }
+    if (!supabaseUrl || !anonKey) { showToast("Add Supabase credentials in Settings first", "warn", 3500); setView("settings"); return; }
+    if (!storeName)   { showToast("Enter store name in Settings", "warn"); setView("settings"); return; }
+    if (!submitter)   { showToast("Enter your name in Settings", "warn"); setView("settings"); return; }
+    if (!countedItems.length) { showToast("No items counted yet", "warn"); return; }
 
     setSubmitting(true);
     try {
-      // Build counts keyed by item name (matches Apps Script VLOOKUP)
-      const namedCounts = {};
-      countedItems.forEach(item => { namedCounts[item.name] = counts[item.id]; });
+      const countsPayload = countedItems.map(item => ({
+        name:  item.name,
+        cat:   item.cat,
+        loc:   item.loc,
+        uom:   item.uom,
+        count: Number(counts[item.id]),
+      }));
 
-      const payload = {
-        storeName,
-        submitter,
-        weekNumber,
-        weekDate,
-        submittedAt: new Date().toISOString(),
-        counts: namedCounts,
-      };
-
-      await submitToSheet(endpointUrl, payload);
+      const written = await submitToSupabase(supabaseUrl, anonKey, {
+        storeName, submitter, weekNumber, weekDate, period,
+        counts: countsPayload,
+        sessionId,
+      });
 
       const ts = new Date().toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
-      setLastSubmit({ time: ts, week: weekNumber, count: countedItems.length });
-      showToast(`✓ Week ${weekNumber} submitted — ${countedItems.length} items sent`, 4000, "success");
+      setLastSubmit({ time: ts, week: weekNumber, count: written });
+      showToast(`✓ ${written} items submitted for Week ${weekNumber}`, "success", 4000);
     } catch(err) {
-      showToast(`Submit failed: ${err.message}. Check your URL in Settings.`, 5000, "error");
+      showToast(`Submit failed: ${err.message}`, "error", 6000);
     }
     setSubmitting(false);
   }
 
   function downloadCSV() {
-    const rows = [["Store","Week","Submitter","Item","Category","Location","UOM","Count","Submitted At"]];
-    const ts = new Date().toISOString();
+    const rows = [["Store","Week","Period","Submitter","Item","Category","Location","UOM","Count","Date"]];
+    const ts = new Date().toISOString().slice(0,10);
     countedItems.forEach(item => {
-      rows.push([storeName, weekNumber, submitter, item.name, item.cat, item.loc, item.uom, counts[item.id], ts]);
+      rows.push([storeName, weekNumber, period, submitter, item.name, item.cat, item.loc, item.uom, counts[item.id], ts]);
     });
-    const csv = rows.map(r => r.map(c => `"${c}"`).join(",")).join("\n");
+    const csv = rows.map(r => r.map(c => `"${c ?? ''}"`).join(",")).join("\n");
     const blob = new Blob([csv], {type:"text/csv"});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
     a.href = url;
-    a.download = `Melty_${storeName||"Store"}_Week${weekNumber}_${new Date().toISOString().slice(0,10)}.csv`;
+    a.download = `Melty_${storeName||"Store"}_Week${weekNumber}_${ts}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+    showToast("CSV downloaded", "info");
   }
 
-  const toastColors = { info:"#1a1a1a", success:"#15803d", warn:"#d97706", error:"#dc2626" };
-  const inp = { width:"100%", border:"1.5px solid #e5e7eb", borderRadius:8, padding:"9px 12px", fontSize:13, boxSizing:"border-box", outline:"none", marginBottom:10 };
+  const toastBg = { info:"#1a1a1a", success:"#15803d", warn:"#d97706", error:"#dc2626" };
+  const inp = { width:"100%", border:"1.5px solid #e5e7eb", borderRadius:8, padding:"9px 12px", fontSize:13, boxSizing:"border-box", outline:"none", marginBottom:10, background:"#fff" };
   const lbl = { display:"block", fontSize:11, color:"#9ca3af", marginBottom:3 };
 
   return (
@@ -266,7 +300,7 @@ export default function App() {
 
       {/* TOAST */}
       {toast && (
-        <div style={{ position:"fixed", top:16, left:"50%", transform:"translateX(-50%)", background:toastColors[toast.type]||"#1a1a1a", color:"#fff", padding:"10px 20px", borderRadius:20, fontSize:13, fontWeight:600, zIndex:999, boxShadow:"0 4px 16px rgba(0,0,0,.3)", whiteSpace:"nowrap", maxWidth:"90vw", textAlign:"center" }}>
+        <div style={{ position:"fixed", top:16, left:"50%", transform:"translateX(-50%)", background:toastBg[toast.type]||"#1a1a1a", color:"#fff", padding:"10px 20px", borderRadius:20, fontSize:13, fontWeight:600, zIndex:999, boxShadow:"0 4px 16px rgba(0,0,0,.3)", maxWidth:"88vw", textAlign:"center" }}>
           {toast.msg}
         </div>
       )}
@@ -277,8 +311,7 @@ export default function App() {
           <div>
             <div style={{ color:"#ef4444", fontWeight:900, fontSize:22, letterSpacing:"-1px" }}>MELTY</div>
             <div style={{ color:"#6b7280", fontSize:11, marginTop:1 }}>
-              {storeName||"Set store name"} · Week {weekNumber}
-              {submitter ? ` · ${submitter}` : ""}
+              {storeName||"Set store in Settings"} · Week {weekNumber}{submitter ? ` · ${submitter}` : ""}
             </div>
           </div>
           <div style={{ textAlign:"right" }}>
@@ -350,13 +383,13 @@ export default function App() {
       {view==="review" && (
         <div style={{ padding:"12px 12px 20px" }}>
 
-          {/* SUBMIT — primary CTA */}
-          <div style={{ background: canSubmit?"#fff":"#f9fafb", borderRadius:14, padding:16, marginBottom:10, boxShadow:"0 1px 4px rgba(0,0,0,.08)", border: canSubmit?"1.5px solid #fca5a5":"1.5px solid #e5e7eb" }}>
-            <div style={{ fontSize:13, fontWeight:700, color:"#111", marginBottom:4 }}>Submit to Google Sheets</div>
+          {/* SUBMIT */}
+          <div style={{ background:"#fff", borderRadius:14, padding:16, marginBottom:10, boxShadow:"0 1px 4px rgba(0,0,0,.08)", border:`1.5px solid ${canSubmit?"#fca5a5":"#e5e7eb"}` }}>
+            <div style={{ fontSize:13, fontWeight:700, color:"#111", marginBottom:4 }}>Submit to Melty</div>
             <div style={{ fontSize:11, color:"#6b7280", marginBottom:12, lineHeight:1.5 }}>
               {canSubmit
-                ? `Ready to submit ${countedItems.length} counts for Week ${weekNumber} to ${storeName}'s sheet.`
-                : "Complete Settings (store name, your name, and sheet URL) before submitting."}
+                ? `Ready — ${countedItems.length} items counted for ${storeName} Week ${weekNumber}.`
+                : "Complete Settings (name, store, and Supabase credentials) before submitting."}
             </div>
             <button
               onClick={handleSubmit}
@@ -372,16 +405,15 @@ export default function App() {
             )}
           </div>
 
-          {/* CSV fallback */}
+          {/* CSV backup */}
           <button onClick={downloadCSV} style={{ width:"100%", padding:"11px", borderRadius:10, border:"none", cursor:"pointer", fontWeight:600, fontSize:12, background:"#1a1a1a", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", gap:6, marginBottom:10 }}>
             <IconDown/> Download CSV (backup)
           </button>
 
-          <button onClick={()=>{ if(window.confirm("Clear all counts for this session?")){ setCounts({}); showToast("Counts cleared"); } }} style={{ width:"100%", marginBottom:14, padding:"9px", borderRadius:8, border:"1px solid #e5e7eb", background:"#fff", color:"#6b7280", fontSize:12, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:5 }}>
+          <button onClick={()=>{ if(window.confirm("Clear all counts for this session?")){ setCounts({}); showToast("Counts cleared"); }}} style={{ width:"100%", marginBottom:14, padding:"9px", borderRadius:8, border:"1px solid #e5e7eb", background:"#fff", color:"#6b7280", fontSize:12, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:5 }}>
             <IconReset/> Clear All Counts
           </button>
 
-          {/* Counted list */}
           {countedItems.length > 0 && <>
             <div style={{ fontSize:10, fontWeight:700, color:"#ef4444", textTransform:"uppercase", letterSpacing:1.2, padding:"4px 0 8px" }}>Counted ({countedItems.length})</div>
             {countedItems.map(item=>(
@@ -411,13 +443,14 @@ export default function App() {
       {view==="settings" && (
         <div style={{ padding:"12px" }}>
 
-          {/* Session info */}
           <div style={{ background:"#fff", borderRadius:10, padding:14, marginBottom:10, boxShadow:"0 1px 3px rgba(0,0,0,.06)" }}>
             <div style={{ fontSize:12, fontWeight:700, color:"#374151", marginBottom:10 }}>Session Info</div>
             <label style={lbl}>Your Name</label>
             <input value={submitter} onChange={e=>setSubmitter(e.target.value)} placeholder="e.g. Sarah M." style={inp}/>
             <label style={lbl}>Store / Location</label>
             <input value={storeName} onChange={e=>setStoreName(e.target.value)} placeholder="e.g. Bristol" style={inp}/>
+            <label style={lbl}>Period (optional)</label>
+            <input value={period} onChange={e=>setPeriod(e.target.value)} placeholder="e.g. Period 7 2026" style={inp}/>
             <label style={lbl}>Week Number</label>
             <div style={{ display:"flex", gap:8, marginBottom:10 }}>
               {[1,2,3,4].map(w=>(
@@ -430,28 +463,39 @@ export default function App() {
             <input value={weekDate} onChange={e=>setWeekDate(e.target.value)} placeholder="e.g. Jun 21, 2026" style={inp}/>
           </div>
 
-          {/* Google Sheets endpoint */}
           <div style={{ background:"#fff", borderRadius:10, padding:14, marginBottom:10, boxShadow:"0 1px 3px rgba(0,0,0,.06)" }}>
-            <div style={{ fontSize:12, fontWeight:700, color:"#374151", marginBottom:4, display:"flex", alignItems:"center", gap:6 }}>
-              <IconWifi/> Google Sheets Endpoint
+            <div style={{ fontSize:12, fontWeight:700, color:"#374151", marginBottom:4 }}>Supabase Connection</div>
+            <div style={{ fontSize:11, color:"#6b7280", marginBottom:10, lineHeight:1.5 }}>
+              Paste your Supabase Project URL and anon public key. These are the same for every franchisee — set once and forget.
             </div>
-            <div style={{ fontSize:11, color:"#6b7280", marginBottom:8, lineHeight:1.5 }}>
-              Paste the Web App URL from your Google Apps Script deployment here. This is unique to each franchisee's sheet.
-            </div>
+            <label style={lbl}>Project URL</label>
             <input
-              value={endpointUrl}
-              onChange={e=>setEndpointUrl(e.target.value.trim())}
-              placeholder="https://script.google.com/macros/s/…/exec"
+              value={supabaseUrl}
+              onChange={e=>setSupabaseUrl(e.target.value.trim())}
+              placeholder="https://xxxx.supabase.co"
               style={{ ...inp, fontFamily:"monospace", fontSize:11 }}
             />
-            {endpointUrl && (
+            <label style={lbl}>Anon Public Key</label>
+            <input
+              value={anonKey}
+              onChange={e=>setAnonKey(e.target.value.trim())}
+              placeholder="eyJhbGciOiJIUzI1NiIs..."
+              style={{ ...inp, fontFamily:"monospace", fontSize:11 }}
+            />
+            {supabaseUrl && anonKey && (
               <button
                 onClick={async () => {
                   try {
-                    await fetch(endpointUrl, { mode:'no-cors' });
-                    showToast("✓ Endpoint reachable", 2000, "success");
+                    const resp = await fetch(`${supabaseUrl}/rest/v1/inventory_submissions?limit=1`, {
+                      headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}` }
+                    });
+                    if (resp.ok || resp.status === 406) {
+                      showToast("✓ Connected to Supabase", "success");
+                    } else {
+                      showToast(`Connection issue: ${resp.status}`, "warn");
+                    }
                   } catch(e) {
-                    showToast("Could not reach endpoint — check URL", 3000, "error");
+                    showToast("Could not reach Supabase — check URL", "error");
                   }
                 }}
                 style={{ fontSize:11, color:"#ef4444", background:"none", border:"none", cursor:"pointer", padding:0, fontWeight:600 }}
@@ -461,16 +505,16 @@ export default function App() {
             )}
           </div>
 
-          {/* Status */}
-          <div style={{ padding:12, background: canSubmit?"#f0fdf4":"#fef2f2", borderRadius:10, border:`1px solid ${canSubmit?"#bbf7d0":"#fecaca"}` }}>
-            <div style={{ fontSize:11, color: canSubmit?"#15803d":"#dc2626", fontWeight:600, marginBottom:4 }}>
+          <div style={{ padding:12, background:canSubmit?"#f0fdf4":"#fef2f2", borderRadius:10, border:`1px solid ${canSubmit?"#bbf7d0":"#fecaca"}` }}>
+            <div style={{ fontSize:11, fontWeight:700, color:canSubmit?"#15803d":"#dc2626", marginBottom:4 }}>
               {canSubmit ? "✓ Ready to submit" : "⚠ Setup incomplete"}
             </div>
-            <div style={{ fontSize:11, color:"#6b7280", lineHeight:1.6 }}>
-              {!storeName && "• Store name required\n"}
-              {!submitter && "• Your name required\n"}
-              {!endpointUrl && "• Google Sheets URL required\n"}
-              {canSubmit && `${countedItems.length} items counted — go to Review to submit.`}
+            <div style={{ fontSize:11, color:"#6b7280", lineHeight:1.8 }}>
+              {!submitter    && "• Your name required\n"}
+              {!storeName    && "• Store name required\n"}
+              {!supabaseUrl  && "• Supabase URL required\n"}
+              {!anonKey      && "• Supabase anon key required\n"}
+              {canSubmit     && `${countedItems.length} items counted — go to Review tab to submit.`}
             </div>
           </div>
         </div>
