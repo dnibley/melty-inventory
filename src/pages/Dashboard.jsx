@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
 
-// ── COST MAP (cost per UOM, from workbook) ────────────────────────────────────
 const COST_MAP = {
   'Bacon Bits Real Cooked .375" Gas Flushed': 7.255,
   'Bacon Precooked Thick Slice': 0.2067,
@@ -87,18 +86,12 @@ const COST_MAP = {
   'Tortilla Strips Tri-colored Fried': 3.572,
   'Beans Black With Corn Flame Roasted Fiesta': 2.4967,
   'Vinegar Rice Seasoned Japanese (1/Gal)': 21.88,
-  'Bam Sauce': 29.78,
-  'Chipotle Mayo': 20.64,
-  'Fry Sauce': 22.92,
-  'Melty Sauce': 18.02,
-  'Mustard Aioli': 9.05,
+  'Bam Sauce': 29.78, 'Chipotle Mayo': 20.64, 'Fry Sauce': 22.92,
+  'Melty Sauce': 18.02, 'Mustard Aioli': 9.05,
   'Avocado Hass Fresh Chunk Pulp Packaged Tray': 4.1863,
-  'Lettuce Romaine Fresh': 3.2583,
-  'Onion Green Iceless': 3.785,
-  'Onion Red Jumbo Sack': 1.343,
-  'Onion Diced Iqf Poly Packaging': 1.8967,
-  'Pepper Jalapeno Fresh': 3.212,
-  'Tomato 1 Layer 5x6': 4.164,
+  'Lettuce Romaine Fresh': 3.2583, 'Onion Green Iceless': 3.785,
+  'Onion Red Jumbo Sack': 1.343, 'Onion Diced Iqf Poly Packaging': 1.8967,
+  'Pepper Jalapeno Fresh': 3.212, 'Tomato 1 Layer 5x6': 4.164,
   'Juice Concentrate Frozen Lemonade 5% 5:1 Yield': 33.19,
   'Syrup Coke Classic 5:1 Yield Bag-in-box': 115.95,
   'Syrup Coke Diet 5:1 Yield Bag-in-box': 115.95,
@@ -108,185 +101,205 @@ const COST_MAP = {
   'Syrup Mountain Blast Sport Bag In Box': 60.5,
   'Syrup Root Beer Bag In Box': 60.5,
   'Syrup Sprite 5:1 Yield Bag-in-box': 115.95,
-  'Tea Brew Filter Pack': 1.3703,
-  '12 oz Canned Soda': 0.528,
-  'Dasani Purified Water': 0.3706,
-  'Juice Apple 100%': 0.9071,
-  'Puree Strawberry': 12.59,
-  'Puree Mango': 17.38,
-  'Puree Raspberry': 17.38,
+  'Tea Brew Filter Pack': 1.3703, '12 oz Canned Soda': 0.528,
+  'Dasani Purified Water': 0.3706, 'Juice Apple 100%': 0.9071,
+  'Puree Strawberry': 12.59, 'Puree Mango': 17.38, 'Puree Raspberry': 17.38,
 };
 
-const fmt$ = n => `$${Number(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})}`;
-const fmtDate = s => s ? new Date(s).toLocaleDateString('en-US', {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'}) : '—';
+const fmt$ = n => `$${Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+const fmtDate = s => s ? new Date(s).toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : '—';
 
-// ── ICONS ─────────────────────────────────────────────────────────────────────
 const IconRefresh = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg>;
-const IconStore   = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>;
 const IconClock   = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>;
 
-export default function Dashboard({ supabaseUrl, anonKey }) {
-  const [data,       setData]       = useState([]);
-  const [loading,    setLoading]    = useState(true);
-  const [error,      setError]      = useState(null);
-  const [activeStore,setActiveStore]= useState("All");
-  const [activeWeek, setActiveWeek] = useState("All");
-  const [lastRefresh,setLastRefresh]= useState(null);
-  const [expandedCat,setExpandedCat]= useState(null);
+const DARK = '#0f0f0f', RED = '#ef4444', CARD = '#1a1a1a', BORD = '#2a2a2a';
+const inp = { width:'100%', background:'#111', border:`1px solid ${BORD}`, borderRadius:8, padding:'10px 12px', fontSize:12, color:'#e5e7eb', outline:'none', boxSizing:'border-box', fontFamily:'monospace', marginBottom:8 };
 
-  const fetchData = useCallback(async () => {
-    if (!supabaseUrl || !anonKey) return;
+export default function Dashboard() {
+  // Credentials stored in dashboard's own localStorage key
+  const [url,     setUrl]     = useState(() => localStorage.getItem('melty_db_url')  || '');
+  const [key,     setKey]     = useState(() => localStorage.getItem('melty_db_key')  || '');
+  const [ready,   setReady]   = useState(() => !!(localStorage.getItem('melty_db_url') && localStorage.getItem('melty_db_key')));
+  const [data,    setData]    = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error,   setError]   = useState(null);
+  const [store,   setStore]   = useState('All');
+  const [week,    setWeek]    = useState('All');
+  const [expCat,  setExpCat]  = useState(null);
+  const [lastRef, setLastRef] = useState(null);
+
+  const fetchData = useCallback(async (supabaseUrl, anonKey) => {
     setLoading(true); setError(null);
     try {
-      // Fetch latest count per item per store per week
       const resp = await fetch(
         `${supabaseUrl}/rest/v1/inventory_submissions?select=store_name,submitter,week_number,week_date,period,item_name,category,location,uom,count,submitted_at&order=submitted_at.desc&limit=5000`,
         { headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}` } }
       );
-      if (!resp.ok) throw new Error(`Supabase ${resp.status}`);
+      if (!resp.ok) throw new Error(`Error ${resp.status} — check credentials`);
       const rows = await resp.json();
-
       // Deduplicate: keep latest per store+week+item
       const seen = new Map();
-      rows.forEach(row => {
-        const key = `${row.store_name}||${row.week_number}||${row.item_name}`;
-        if (!seen.has(key)) seen.set(key, row);
+      rows.forEach(r => {
+        const k = `${r.store_name}||${r.week_number}||${r.item_name}`;
+        if (!seen.has(k)) seen.set(k, r);
       });
       setData([...seen.values()]);
-      setLastRefresh(new Date());
-    } catch(e) {
-      setError(e.message);
-    }
+      setLastRef(new Date());
+    } catch(e) { setError(e.message); }
     setLoading(false);
-  }, [supabaseUrl, anonKey]);
+  }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  function handleConnect() {
+    if (!url || !key) return;
+    localStorage.setItem('melty_db_url', url);
+    localStorage.setItem('melty_db_key', key);
+    setReady(true);
+    fetchData(url, key);
+  }
 
-  if (!supabaseUrl || !anonKey) {
+  useEffect(() => { if (ready && url && key) fetchData(url, key); }, [ready]);
+
+  // ── CREDENTIAL ENTRY SCREEN ───────────────────────────────────────────────
+  if (!ready) {
     return (
-      <div style={{ minHeight:"100vh", background:"#0f0f0f", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"'Inter',system-ui,sans-serif" }}>
-        <div style={{ textAlign:"center", color:"#6b7280", padding:40 }}>
-          <div style={{ color:"#ef4444", fontWeight:900, fontSize:28, letterSpacing:"-1px", marginBottom:8 }}>MELTY</div>
-          <div style={{ fontSize:14 }}>No Supabase credentials found.</div>
-          <div style={{ fontSize:12, marginTop:6 }}>Open the counting app on your phone and configure Settings first.</div>
+      <div style={{ minHeight:'100vh', background:DARK, display:'flex', alignItems:'center', justifyContent:'center', fontFamily:"'Inter',system-ui,sans-serif", padding:20 }}>
+        <div style={{ width:'100%', maxWidth:400 }}>
+          <div style={{ color:RED, fontWeight:900, fontSize:28, letterSpacing:'-1px', marginBottom:4 }}>MELTY</div>
+          <div style={{ color:'#4b5563', fontSize:13, marginBottom:32 }}>Ops Dashboard</div>
+          <div style={{ background:CARD, borderRadius:14, padding:24, border:`1px solid ${BORD}` }}>
+            <div style={{ fontSize:13, fontWeight:700, color:'#f9fafb', marginBottom:4 }}>Connect to Supabase</div>
+            <div style={{ fontSize:11, color:'#6b7280', marginBottom:16, lineHeight:1.6 }}>
+              Enter your Supabase Project URL and anon key. These are saved in this browser — you only need to do this once.
+            </div>
+            <label style={{ fontSize:11, color:'#6b7280', display:'block', marginBottom:4 }}>Project URL</label>
+            <input value={url} onChange={e=>setUrl(e.target.value.trim())} placeholder="https://xxxx.supabase.co" style={inp}/>
+            <label style={{ fontSize:11, color:'#6b7280', display:'block', marginBottom:4 }}>Anon Public Key</label>
+            <input value={key} onChange={e=>setKey(e.target.value.trim())} placeholder="eyJhbGci..." style={{...inp, marginBottom:16}}/>
+            <button
+              onClick={handleConnect}
+              disabled={!url || !key}
+              style={{ width:'100%', padding:'12px', borderRadius:10, border:'none', cursor:url&&key?'pointer':'not-allowed', fontWeight:700, fontSize:14, background:url&&key?RED:'#2a2a2a', color:url&&key?'#fff':'#4b5563' }}
+            >
+              Connect →
+            </button>
+          </div>
+          <div style={{ fontSize:11, color:'#374151', marginTop:12, textAlign:'center' }}>
+            Find these in your Supabase project under Settings → API Keys
+          </div>
         </div>
       </div>
     );
   }
 
-  // Derive stores, weeks from data
-  const stores  = ["All", ...new Set(data.map(r => r.store_name))].sort();
-  const weeks   = ["All", ...new Set(data.map(r => r.week_number))].sort();
+  // ── MAIN DASHBOARD ────────────────────────────────────────────────────────
+  const stores  = ['All', ...new Set(data.map(r => r.store_name))].sort();
+  const weeks   = ['All', ...new Set(data.map(r => r.week_number))].sort((a,b) => a===b?0:a==='All'?-1:b==='All'?1:a-b);
 
-  // Filter
   const filtered = data.filter(r =>
-    (activeStore === "All" || r.store_name === activeStore) &&
-    (activeWeek  === "All" || r.week_number === Number(activeWeek))
+    (store==='All' || r.store_name===store) &&
+    (week==='All'  || r.week_number===Number(week))
   );
 
-  // Compute inventory value
-  const totalValue = filtered.reduce((sum, r) => {
-    const cpuom = COST_MAP[r.item_name] || 0;
-    return sum + (Number(r.count) * cpuom);
-  }, 0);
+  const totalValue = filtered.reduce((s,r) => s + Number(r.count)*(COST_MAP[r.item_name]||0), 0);
 
-  // Group by category
   const byCategory = {};
   filtered.forEach(r => {
     if (!byCategory[r.category]) byCategory[r.category] = [];
     byCategory[r.category].push(r);
   });
 
-  // Per-store summary for multi-store view
   const byStore = {};
-  data.filter(r => activeWeek === "All" || r.week_number === Number(activeWeek)).forEach(r => {
-    if (!byStore[r.store_name]) byStore[r.store_name] = { items:0, value:0, lastSub:null, submitter:'' };
+  data.filter(r => week==='All' || r.week_number===Number(week)).forEach(r => {
+    if (!byStore[r.store_name]) byStore[r.store_name] = {items:0, value:0, lastSub:null, submitter:''};
     const s = byStore[r.store_name];
     s.items++;
-    s.value += (Number(r.count) * (COST_MAP[r.item_name]||0));
+    s.value += Number(r.count)*(COST_MAP[r.item_name]||0);
     if (!s.lastSub || r.submitted_at > s.lastSub) { s.lastSub = r.submitted_at; s.submitter = r.submitter; }
   });
 
-  const DARK = '#0f0f0f';
-  const RED  = '#ef4444';
-  const CARD = '#1a1a1a';
-  const BORD = '#2a2a2a';
-
   return (
-    <div style={{ minHeight:"100vh", background:DARK, fontFamily:"'Inter',system-ui,sans-serif", color:"#e5e7eb" }}>
+    <div style={{ minHeight:'100vh', background:DARK, fontFamily:"'Inter',system-ui,sans-serif", color:'#e5e7eb' }}>
 
       {/* HEADER */}
-      <div style={{ background:CARD, borderBottom:`1px solid ${BORD}`, padding:"16px 20px", position:"sticky", top:0, zIndex:50 }}>
-        <div style={{ maxWidth:1100, margin:"0 auto", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+      <div style={{ background:CARD, borderBottom:`1px solid ${BORD}`, padding:'16px 20px', position:'sticky', top:0, zIndex:50 }}>
+        <div style={{ maxWidth:1100, margin:'0 auto', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
           <div>
-            <div style={{ color:RED, fontWeight:900, fontSize:20, letterSpacing:"-0.5px" }}>MELTY <span style={{ color:"#4b5563", fontWeight:400, fontSize:13 }}>Ops Dashboard</span></div>
-            <div style={{ color:"#4b5563", fontSize:11, marginTop:2, display:"flex", alignItems:"center", gap:4 }}>
-              <IconClock/> {lastRefresh ? `Updated ${fmtDate(lastRefresh.toISOString())}` : "Loading…"}
+            <div style={{ color:RED, fontWeight:900, fontSize:20, letterSpacing:'-0.5px' }}>
+              MELTY <span style={{ color:'#4b5563', fontWeight:400, fontSize:13 }}>Ops Dashboard</span>
+            </div>
+            <div style={{ color:'#4b5563', fontSize:11, marginTop:2, display:'flex', alignItems:'center', gap:4 }}>
+              <IconClock/> {lastRef ? `Updated ${fmtDate(lastRef.toISOString())}` : 'Loading…'}
             </div>
           </div>
-          <button onClick={fetchData} disabled={loading} style={{ display:"flex", alignItems:"center", gap:6, padding:"8px 14px", borderRadius:8, border:`1px solid ${BORD}`, background:"transparent", color:"#9ca3af", fontSize:12, cursor:"pointer", fontWeight:600 }}>
-            <IconRefresh/> {loading ? "Refreshing…" : "Refresh"}
-          </button>
+          <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+            <button onClick={()=>fetchData(url,key)} disabled={loading} style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 14px', borderRadius:8, border:`1px solid ${BORD}`, background:'transparent', color:'#9ca3af', fontSize:12, cursor:'pointer', fontWeight:600 }}>
+              <IconRefresh/> {loading ? 'Refreshing…' : 'Refresh'}
+            </button>
+            <button onClick={()=>{ localStorage.removeItem('melty_db_url'); localStorage.removeItem('melty_db_key'); setReady(false); setData([]); }} style={{ padding:'8px 12px', borderRadius:8, border:`1px solid ${BORD}`, background:'transparent', color:'#4b5563', fontSize:11, cursor:'pointer' }}>
+              Disconnect
+            </button>
+          </div>
         </div>
       </div>
 
-      <div style={{ maxWidth:1100, margin:"0 auto", padding:"20px 16px" }}>
+      <div style={{ maxWidth:1100, margin:'0 auto', padding:'20px 16px' }}>
 
         {error && (
-          <div style={{ background:"#450a0a", border:"1px solid #7f1d1d", borderRadius:10, padding:"12px 16px", marginBottom:16, color:"#fca5a5", fontSize:13 }}>
-            ⚠ {error} — check your Supabase credentials in the counting app Settings.
+          <div style={{ background:'#450a0a', border:'1px solid #7f1d1d', borderRadius:10, padding:'12px 16px', marginBottom:16, color:'#fca5a5', fontSize:13 }}>
+            ⚠ {error}
           </div>
         )}
 
         {/* FILTERS */}
-        <div style={{ display:"flex", gap:8, marginBottom:20, flexWrap:"wrap" }}>
-          <div style={{ display:"flex", gap:4, background:CARD, borderRadius:10, padding:4, border:`1px solid ${BORD}` }}>
-            <span style={{ padding:"6px 10px", fontSize:11, color:"#6b7280", display:"flex", alignItems:"center", gap:4 }}><IconStore/> Store</span>
+        <div style={{ display:'flex', gap:8, marginBottom:20, flexWrap:'wrap' }}>
+          <div style={{ display:'flex', gap:4, background:CARD, borderRadius:10, padding:4, border:`1px solid ${BORD}` }}>
+            <span style={{ padding:'6px 10px', fontSize:11, color:'#6b7280' }}>Store</span>
             {stores.map(s => (
-              <button key={s} onClick={()=>setActiveStore(s)} style={{ padding:"6px 12px", borderRadius:7, border:"none", cursor:"pointer", fontSize:12, fontWeight:600, background:activeStore===s?RED:"transparent", color:activeStore===s?"#fff":"#9ca3af", transition:"all .15s" }}>{s}</button>
+              <button key={s} onClick={()=>setStore(s)} style={{ padding:'6px 12px', borderRadius:7, border:'none', cursor:'pointer', fontSize:12, fontWeight:600, background:store===s?RED:'transparent', color:store===s?'#fff':'#9ca3af', transition:'all .15s' }}>{s}</button>
             ))}
           </div>
-          <div style={{ display:"flex", gap:4, background:CARD, borderRadius:10, padding:4, border:`1px solid ${BORD}` }}>
-            <span style={{ padding:"6px 10px", fontSize:11, color:"#6b7280" }}>Week</span>
+          <div style={{ display:'flex', gap:4, background:CARD, borderRadius:10, padding:4, border:`1px solid ${BORD}` }}>
+            <span style={{ padding:'6px 10px', fontSize:11, color:'#6b7280' }}>Week</span>
             {weeks.map(w => (
-              <button key={w} onClick={()=>setActiveWeek(String(w))} style={{ padding:"6px 12px", borderRadius:7, border:"none", cursor:"pointer", fontSize:12, fontWeight:600, background:String(activeWeek)===String(w)?RED:"transparent", color:String(activeWeek)===String(w)?"#fff":"#9ca3af", transition:"all .15s" }}>{w === "All" ? "All" : `W${w}`}</button>
+              <button key={w} onClick={()=>setWeek(String(w))} style={{ padding:'6px 12px', borderRadius:7, border:'none', cursor:'pointer', fontSize:12, fontWeight:600, background:String(week)===String(w)?RED:'transparent', color:String(week)===String(w)?'#fff':'#9ca3af', transition:'all .15s' }}>{w==='All'?'All':`W${w}`}</button>
             ))}
           </div>
         </div>
 
         {loading && !data.length ? (
-          <div style={{ textAlign:"center", color:"#4b5563", padding:60, fontSize:14 }}>Loading submissions…</div>
+          <div style={{ textAlign:'center', color:'#4b5563', padding:60, fontSize:14 }}>Loading submissions…</div>
         ) : (
           <>
-            {/* TOP STATS */}
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(180px,1fr))", gap:12, marginBottom:24 }}>
+            {/* STAT CARDS */}
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:12, marginBottom:24 }}>
               {[
-                { label:"Inventory Value", value:fmt$(totalValue), sub:"at cost" },
-                { label:"Items Counted",   value:filtered.length, sub:`of 116 total` },
-                { label:"Locations",       value:Object.keys(byStore).length, sub:"active this period" },
-                { label:"Submissions",     value:new Set(data.map(r=>`${r.store_name}||${r.week_number}`)).size, sub:"store-week pairs" },
-              ].map(stat => (
-                <div key={stat.label} style={{ background:CARD, border:`1px solid ${BORD}`, borderRadius:12, padding:"16px 18px" }}>
-                  <div style={{ fontSize:11, color:"#6b7280", marginBottom:4, textTransform:"uppercase", letterSpacing:.8 }}>{stat.label}</div>
-                  <div style={{ fontSize:26, fontWeight:800, color:"#f9fafb", letterSpacing:"-1px" }}>{stat.value}</div>
-                  <div style={{ fontSize:11, color:"#4b5563", marginTop:2 }}>{stat.sub}</div>
+                { label:'Inventory Value', value:fmt$(totalValue), sub:'at cost' },
+                { label:'Items Counted',   value:filtered.length,  sub:'line items' },
+                { label:'Locations',       value:Object.keys(byStore).length, sub:'active' },
+                { label:'Store-Weeks',     value:new Set(data.map(r=>`${r.store_name}||${r.week_number}`)).size, sub:'submissions' },
+              ].map(s => (
+                <div key={s.label} style={{ background:CARD, border:`1px solid ${BORD}`, borderRadius:12, padding:'16px 18px' }}>
+                  <div style={{ fontSize:11, color:'#6b7280', marginBottom:4, textTransform:'uppercase', letterSpacing:.8 }}>{s.label}</div>
+                  <div style={{ fontSize:26, fontWeight:800, color:'#f9fafb', letterSpacing:'-1px' }}>{s.value}</div>
+                  <div style={{ fontSize:11, color:'#4b5563', marginTop:2 }}>{s.sub}</div>
                 </div>
               ))}
             </div>
 
-            {/* PER-STORE CARDS (when All stores selected) */}
-            {activeStore === "All" && Object.keys(byStore).length > 0 && (
+            {/* STORE CARDS */}
+            {store==='All' && Object.keys(byStore).length > 0 && (
               <div style={{ marginBottom:24 }}>
-                <div style={{ fontSize:11, fontWeight:700, color:"#6b7280", textTransform:"uppercase", letterSpacing:1, marginBottom:10 }}>Locations</div>
-                <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(220px,1fr))", gap:10 }}>
-                  {Object.entries(byStore).sort().map(([store, s]) => (
-                    <div key={store} onClick={()=>setActiveStore(store)} style={{ background:CARD, border:`1px solid ${BORD}`, borderRadius:12, padding:"14px 16px", cursor:"pointer", transition:"border-color .15s" }}
+                <div style={{ fontSize:11, fontWeight:700, color:'#6b7280', textTransform:'uppercase', letterSpacing:1, marginBottom:10 }}>Locations</div>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))', gap:10 }}>
+                  {Object.entries(byStore).sort().map(([name, s]) => (
+                    <div key={name} onClick={()=>setStore(name)}
+                      style={{ background:CARD, border:`1px solid ${BORD}`, borderRadius:12, padding:'14px 16px', cursor:'pointer', transition:'border-color .15s' }}
                       onMouseEnter={e=>e.currentTarget.style.borderColor=RED}
                       onMouseLeave={e=>e.currentTarget.style.borderColor=BORD}>
-                      <div style={{ fontSize:14, fontWeight:700, color:"#f9fafb", marginBottom:6 }}>{store}</div>
+                      <div style={{ fontSize:14, fontWeight:700, color:'#f9fafb', marginBottom:6 }}>{name}</div>
                       <div style={{ fontSize:22, fontWeight:800, color:RED }}>{fmt$(s.value)}</div>
-                      <div style={{ fontSize:11, color:"#4b5563", marginTop:4 }}>{s.items} items · {s.submitter}</div>
-                      <div style={{ fontSize:10, color:"#374151", marginTop:2, display:"flex", alignItems:"center", gap:3 }}><IconClock/>{fmtDate(s.lastSub)}</div>
+                      <div style={{ fontSize:11, color:'#4b5563', marginTop:4 }}>{s.items} items · {s.submitter}</div>
+                      <div style={{ fontSize:10, color:'#374151', marginTop:2, display:'flex', alignItems:'center', gap:3 }}><IconClock/>{fmtDate(s.lastSub)}</div>
                     </div>
                   ))}
                 </div>
@@ -296,41 +309,38 @@ export default function Dashboard({ supabaseUrl, anonKey }) {
             {/* CATEGORY BREAKDOWN */}
             {filtered.length > 0 && (
               <div>
-                <div style={{ fontSize:11, fontWeight:700, color:"#6b7280", textTransform:"uppercase", letterSpacing:1, marginBottom:10 }}>
-                  {activeStore !== "All" ? activeStore : "All Locations"} · Inventory by Category
+                <div style={{ fontSize:11, fontWeight:700, color:'#6b7280', textTransform:'uppercase', letterSpacing:1, marginBottom:10 }}>
+                  {store !== 'All' ? store : 'All Locations'} · By Category
                 </div>
                 {Object.entries(byCategory).sort().map(([cat, items]) => {
-                  const catValue = items.reduce((s,r) => s + Number(r.count)*(COST_MAP[r.item_name]||0), 0);
-                  const isOpen   = expandedCat === cat;
+                  const catVal = items.reduce((s,r) => s + Number(r.count)*(COST_MAP[r.item_name]||0), 0);
+                  const open   = expCat === cat;
                   return (
-                    <div key={cat} style={{ marginBottom:8, background:CARD, border:`1px solid ${BORD}`, borderRadius:12, overflow:"hidden" }}>
-                      <div
-                        onClick={()=>setExpandedCat(isOpen ? null : cat)}
-                        style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"13px 16px", cursor:"pointer" }}
-                      >
-                        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                    <div key={cat} style={{ marginBottom:8, background:CARD, border:`1px solid ${BORD}`, borderRadius:12, overflow:'hidden' }}>
+                      <div onClick={()=>setExpCat(open?null:cat)} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'13px 16px', cursor:'pointer' }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
                           <div style={{ width:3, height:16, background:RED, borderRadius:2 }}/>
-                          <span style={{ fontSize:13, fontWeight:700, color:"#f9fafb" }}>{cat}</span>
-                          <span style={{ fontSize:11, color:"#4b5563" }}>{items.length} items</span>
+                          <span style={{ fontSize:13, fontWeight:700, color:'#f9fafb' }}>{cat}</span>
+                          <span style={{ fontSize:11, color:'#4b5563' }}>{items.length} items</span>
                         </div>
-                        <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-                          <span style={{ fontSize:15, fontWeight:800, color:RED }}>{fmt$(catValue)}</span>
-                          <span style={{ color:"#4b5563", fontSize:12 }}>{isOpen ? "▲" : "▼"}</span>
+                        <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                          <span style={{ fontSize:15, fontWeight:800, color:RED }}>{fmt$(catVal)}</span>
+                          <span style={{ color:'#4b5563', fontSize:12 }}>{open?'▲':'▼'}</span>
                         </div>
                       </div>
-                      {isOpen && (
-                        <div style={{ borderTop:`1px solid ${BORD}`, padding:"4px 0 8px" }}>
+                      {open && (
+                        <div style={{ borderTop:`1px solid ${BORD}`, padding:'4px 0 8px' }}>
                           {items.sort((a,b)=>a.item_name.localeCompare(b.item_name)).map(r => {
-                            const val = Number(r.count) * (COST_MAP[r.item_name]||0);
+                            const val = Number(r.count)*(COST_MAP[r.item_name]||0);
                             return (
-                              <div key={r.item_name+r.store_name} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"7px 16px", borderBottom:`1px solid #1f1f1f` }}>
+                              <div key={r.item_name+r.store_name} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 16px', borderBottom:'1px solid #1f1f1f' }}>
                                 <div style={{ flex:1, minWidth:0 }}>
-                                  <div style={{ fontSize:12, fontWeight:500, color:"#d1d5db", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{r.item_name}</div>
-                                  <div style={{ fontSize:10, color:"#4b5563" }}>{r.store_name} · W{r.week_number} · {r.submitter}</div>
+                                  <div style={{ fontSize:12, fontWeight:500, color:'#d1d5db', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{r.item_name}</div>
+                                  <div style={{ fontSize:10, color:'#4b5563' }}>{r.store_name} · W{r.week_number} · {r.submitter}</div>
                                 </div>
-                                <div style={{ textAlign:"right", flexShrink:0, marginLeft:12 }}>
-                                  <div style={{ fontSize:13, fontWeight:700, color:"#f9fafb" }}>{r.count} <span style={{ fontSize:10, color:"#4b5563", fontWeight:400 }}>{r.uom}</span></div>
-                                  <div style={{ fontSize:11, color:"#6b7280" }}>{fmt$(val)}</div>
+                                <div style={{ textAlign:'right', flexShrink:0, marginLeft:12 }}>
+                                  <div style={{ fontSize:13, fontWeight:700, color:'#f9fafb' }}>{r.count} <span style={{ fontSize:10, color:'#4b5563', fontWeight:400 }}>{r.uom}</span></div>
+                                  <div style={{ fontSize:11, color:'#6b7280' }}>{fmt$(val)}</div>
                                 </div>
                               </div>
                             );
@@ -344,10 +354,9 @@ export default function Dashboard({ supabaseUrl, anonKey }) {
             )}
 
             {filtered.length === 0 && !loading && (
-              <div style={{ textAlign:"center", color:"#4b5563", padding:60 }}>
+              <div style={{ textAlign:'center', color:'#4b5563', padding:60 }}>
                 <div style={{ fontSize:32, marginBottom:8 }}>📋</div>
-                <div style={{ fontSize:14 }}>No submissions found for this filter.</div>
-                <div style={{ fontSize:12, marginTop:4 }}>Change the store or week filter above.</div>
+                <div style={{ fontSize:14 }}>No submissions yet for this filter.</div>
               </div>
             )}
           </>
